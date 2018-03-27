@@ -153,10 +153,12 @@ public class Benchmark {
 		FileSystem fs = FileSystem.get(conf);
 		
 		int count = Integer.parseInt(params.get("count", "5"));
-		double ratio = Double.parseDouble(params.get("ratio", "0.0001"));
+//		double ratio = Double.parseDouble(params.get("ratio", "0.0001"));
+		String queries = params.get("queries");
 		
 		StringBuilder rectsBuilder = new StringBuilder();
-		Path benchmarkPath = new Path(String.format("benchmarks2/benchmark_%f_%d.txt", ratio, 1000));
+//		Path benchmarkPath = new Path(String.format("benchmarks2/benchmark_%f_%d.txt", ratio, 1000));
+		Path benchmarkPath = new Path(queries);
 		LineReader in = new LineReader(fs.open(benchmarkPath));
 		Text tempLine = new Text2();
 		for (int i = 0; i < count; i++) {

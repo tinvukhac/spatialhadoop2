@@ -164,6 +164,8 @@ public class Main {
       
       pgd.addClass("benchmark", Benchmark.class, "Benchmark query performance");
       
+      pgd.addClass("loadtwitterdata", LoadTwitterData.class, "Load twitter data");
+      
       pgd.driver(args);
       
       // Success
