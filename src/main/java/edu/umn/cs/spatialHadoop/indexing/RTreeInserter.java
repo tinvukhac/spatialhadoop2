@@ -47,6 +47,7 @@ public class RTreeInserter {
 		LocalIndexes = new HashMap<String, Class<? extends LocalIndexer>>();
 		LocalIndexes.put("rtree", RTreeLocalIndexer.class);
 		LocalIndexes.put("r+tree", RTreeLocalIndexer.class);
+		LocalIndexes.put("rtree2", RTreeLocalIndexer.class);
 	}
 
 	/**
@@ -151,6 +152,7 @@ public class RTreeInserter {
 		// Set input and output
 		job.setInputFormatClass(SpatialInputFormat3.class);
 		SpatialInputFormat3.setInputPaths(job, insertPath);
+		setLocalIndexer(conf, index);
 		job.setOutputFormatClass(IndexOutputFormat.class);
 		Path tempPath = new Path(currentPath, "temp");
 		IndexOutputFormat.setOutputPath(job, tempPath);

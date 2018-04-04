@@ -9,19 +9,15 @@
 package edu.umn.cs.spatialHadoop.indexing;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Vector;
 import java.util.ArrayList;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -72,13 +68,14 @@ public class Indexer {
 		PartitionerClasses.put("grid", GridPartitioner.class);
 		PartitionerClasses.put("str", STRPartitioner.class);
 		PartitionerClasses.put("str+", STRPartitioner.class);
-		PartitionerClasses.put("rtree", STRPartitioner.class);
-		PartitionerClasses.put("r+tree", STRPartitioner.class);
+		PartitionerClasses.put("rtree", RStarTreePartitioner.class);
+		PartitionerClasses.put("r+tree", RStarTreePartitioner.class);
 		PartitionerClasses.put("quadtree", QuadTreePartitioner.class);
 		PartitionerClasses.put("zcurve", ZCurvePartitioner.class);
 		PartitionerClasses.put("hilbert", HilbertCurvePartitioner.class);
 		PartitionerClasses.put("kdtree", KdTreePartitioner.class);
-		PartitionerClasses.put("rtree2", RTreePartitioner.class);
+		PartitionerClasses.put("r*tree", RStarTreePartitioner.class);
+		PartitionerClasses.put("r*tree+", RStarTreePartitioner.class);
 
 		PartitionerReplicate = new HashMap<String, Boolean>();
 		PartitionerReplicate.put("grid", true);
@@ -90,7 +87,8 @@ public class Indexer {
 		PartitionerReplicate.put("zcurve", false);
 		PartitionerReplicate.put("hilbert", false);
 		PartitionerReplicate.put("kdtree", true);
-		PartitionerReplicate.put("rtree2", false);
+		PartitionerReplicate.put("r*tree", false);
+		PartitionerReplicate.put("r*tree+", true);
 
 		LocalIndexes = new HashMap<String, Class<? extends LocalIndexer>>();
 		LocalIndexes.put("rtree", RTreeLocalIndexer.class);
@@ -125,6 +123,9 @@ public class Indexer {
 				throws IOException, InterruptedException {
 			final IntWritable partitionID = new IntWritable();
 			for (final Shape shape : shapes) {
+				Rectangle shapeMBR = shape.getMBR();
+				if (shapeMBR == null)
+					continue;
 				if (replicate) {
 					partitioner.overlapPartitions(shape, new ResultCollector<Integer>() {
 						@Override
@@ -141,11 +142,8 @@ public class Indexer {
 					});
 				} else {
 					partitionID.set(partitioner.overlapPartition(shape));
-					if (partitionID.get() >= 0) {
+					if (partitionID.get() >= 0)
 						context.write(partitionID, shape);
-					} else {
-						LOG.info("no partition ID");
-					}
 				}
 				context.progress();
 			}
@@ -159,12 +157,8 @@ public class Indexer {
 				throws IOException, InterruptedException {
 			LOG.info("Working on partition #" + partitionID);
 			for (Shape shape : shapes) {
-				if (shape != null) {
-					context.write(partitionID, shape);
-					context.progress();
-				} else {
-					LOG.info("Shape is null");
-				}
+				context.write(partitionID, shape);
+				context.progress();
 			}
 			// Indicate end of partition to close the file
 			context.write(new IntWritable(-partitionID.get() - 1), null);
@@ -181,11 +175,9 @@ public class Indexer {
 		// Set input file MBR if not already set
 		Rectangle inputMBR = (Rectangle) OperationsParams.getShape(conf, "mbr");
 		if (inputMBR == null) {
-			System.out.println("Input mbr was not set");
+			System.out.println("MBR is not set");
 			inputMBR = FileMBR.fileMBR(inPath, new OperationsParams(conf));
 			OperationsParams.setShape(conf, "mbr", inputMBR);
-		} else {
-			System.out.println("Input mbr was already set");
 		}
 
 		// Set the correct partitioner according to index type
@@ -232,7 +224,7 @@ public class Indexer {
 	/**
 	 * Set the local indexer for the given job configuration.
 	 * 
-	 * @param job
+	 * @param conf
 	 * @param sindex
 	 */
 	private static void setLocalIndexer(Configuration conf, String sindex) {
@@ -330,7 +322,7 @@ public class Indexer {
 		}
 	}
 
-	public static void indexLocal(Path inPath, final Path outPath, OperationsParams params)
+	private static void indexLocal(Path inPath, final Path outPath, OperationsParams params)
 			throws IOException, InterruptedException {
 		Job job = Job.getInstance(params);
 		final Configuration conf = job.getConfiguration();
@@ -429,12 +421,6 @@ public class Indexer {
 		}
 		in.close();
 		wktOut.close();
-
-		// Path permanentFile = new Path(outPath, "_partitioner." + sindex);
-		// FSDataOutputStream out = outFs.create(permanentFile);
-		// partitioner.write(out);
-		// out.close();
-		// System.out.println("Local indexing");
 	}
 
 	public static Job index(Path inPath, Path outPath, OperationsParams params)
@@ -443,7 +429,10 @@ public class Indexer {
 			indexLocal(inPath, outPath, params);
 			return null;
 		} else {
-			return indexMapReduce(inPath, outPath, params);
+			Job job = indexMapReduce(inPath, outPath, params);
+			if (!job.isSuccessful())
+				throw new RuntimeException("Failed job " + job);
+			return job;
 		}
 	}
 

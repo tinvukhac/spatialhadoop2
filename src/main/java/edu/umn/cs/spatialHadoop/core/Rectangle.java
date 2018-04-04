@@ -38,12 +38,12 @@ public class Rectangle implements Shape, WritableComparable<Rectangle> {
 	}
 
 	/**
-	 * Constructs a new <code>Rectangle</code>, initialized to match the values
-	 * of the specified <code>Rectangle</code>.
+	 * Constructs a new <code>Rectangle</code>, initialized to match the values of
+	 * the specified <code>Rectangle</code>.
 	 * 
 	 * @param r
-	 *            the <code>Rectangle</code> from which to copy initial values
-	 *            to a newly constructed <code>Rectangle</code>
+	 *            the <code>Rectangle</code> from which to copy initial values to a
+	 *            newly constructed <code>Rectangle</code>
 	 * @since 1.1
 	 */
 	public Rectangle(Rectangle r) {
@@ -85,8 +85,8 @@ public class Rectangle implements Shape, WritableComparable<Rectangle> {
 	}
 
 	/**
-	 * Comparison is done by lexicographic ordering of attributes &lt; x1, y1,
-	 * x2, y2&gt;
+	 * Comparison is done by lexicographic ordering of attributes &lt; x1, y1, x2,
+	 * y2&gt;
 	 */
 	public int compareTo(Shape s) {
 		Rectangle rect2 = (Rectangle) s;
@@ -228,10 +228,21 @@ public class Rectangle implements Shape, WritableComparable<Rectangle> {
 		return new Rectangle(ux1, uy1, ux2, uy2);
 	}
 
+	public void expand(double x, double y) {
+		if (x < this.x1)
+			this.x1 = x;
+		if (y < this.y1)
+			this.y1 = y;
+		if (x > this.x2)
+			this.x2 = x;
+		if (y > this.y2)
+			this.y2 = y;
+	}
+
 	public void expand(final Shape s) {
 		Rectangle r = s.getMBR();
-		
-		if(r != null) {
+
+		if (r != null) {
 			if (r.x1 < this.x1)
 				this.x1 = r.x1;
 			if (r.x2 > this.x2)
@@ -353,25 +364,25 @@ public class Rectangle implements Shape, WritableComparable<Rectangle> {
 
 		return results;
 	}
-	
+
 	// Split to 2 equal rectangles with minimum total margin
-	public  Rectangle[] split() {
+	public Rectangle[] split() {
 		Rectangle[] rects = new Rectangle[2];
-		
-		if(Math.abs(x2 - x1) > Math.abs(y2 - y1)) {
-			rects[0] = new Rectangle(x1, y1, (x2 + x1)/2, y2);
-			rects[1] = new Rectangle((x2 + x1)/2, y1, x2, y2);
+
+		if (Math.abs(x2 - x1) > Math.abs(y2 - y1)) {
+			rects[0] = new Rectangle(x1, y1, (x2 + x1) / 2, y2);
+			rects[1] = new Rectangle((x2 + x1) / 2, y1, x2, y2);
 		} else {
 			rects[0] = new Rectangle(x1, y1, x2, (y2 + y1) / 2);
 			rects[1] = new Rectangle(x1, (y2 + y1) / 2, x2, y2);
 		}
-		
+
 		return rects;
 	}
 
 	/**
-	 * Compute the intersection of a line segment with the rectangle border. It
-	 * is assumed that p1 lies inside the rectangle while p2 is outside it.
+	 * Compute the intersection of a line segment with the rectangle border. It is
+	 * assumed that p1 lies inside the rectangle while p2 is outside it.
 	 * 
 	 * @param p1
 	 * @param p2
@@ -425,8 +436,8 @@ public class Rectangle implements Shape, WritableComparable<Rectangle> {
 	}
 
 	/**
-	 * Compares two rectangles according to a lexicographic order of the
-	 * attributes (x1, y1, x2, y2)
+	 * Compares two rectangles according to a lexicographic order of the attributes
+	 * (x1, y1, x2, y2)
 	 */
 	@Override
 	public int compareTo(Rectangle r2) {
