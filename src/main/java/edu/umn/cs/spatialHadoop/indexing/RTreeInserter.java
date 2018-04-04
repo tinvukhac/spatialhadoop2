@@ -117,7 +117,7 @@ public class RTreeInserter {
 		String sindex = params.get("sindex");
 
 		Path currentMasterPath = new Path(currentPath, "_master." + sindex);
-		Path insertMasterPath = new Path(currentPath, TEMP_APPENDING_PATH + "/_master." + sindex);
+//		Path insertMasterPath = new Path(currentPath, TEMP_APPENDING_PATH + "/_master." + sindex);
 
 		ArrayList<Partition> partitionsToAppend = new ArrayList<Partition>();
 		for (Partition insertPartition : insertPartitions) {
