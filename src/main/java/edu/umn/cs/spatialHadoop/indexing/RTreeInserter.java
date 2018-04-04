@@ -186,6 +186,7 @@ public class RTreeInserter {
 
 	public static void append(Path currentPath, Path insertPath, OperationsParams params) throws ClassNotFoundException,
 			InstantiationException, IllegalAccessException, IOException, InterruptedException {
+		params.setBoolean("isAppending", true);
 		insertMapReduce(currentPath, insertPath, params);
 //		appendNewFiles(currentPath, params);
 	}
