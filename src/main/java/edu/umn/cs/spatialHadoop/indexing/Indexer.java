@@ -186,7 +186,14 @@ public class Indexer {
 			throw new RuntimeException("Index type is not set");
 		long t1 = System.currentTimeMillis();
 		setLocalIndexer(conf, index);
-		Partitioner partitioner = createPartitioner(inPath, outPath, conf, index);
+		Partitioner partitioner;
+		boolean isAppending = paramss.getBoolean("isAppending", false);
+		if(isAppending) {
+			partitioner = new RTreeFilePartitioner();
+			((RTreeFilePartitioner) partitioner).createFromMasterFile(inPath, paramss);
+		} else {
+			partitioner = createPartitioner(inPath, outPath, conf, index);
+		}
 		Partitioner.setPartitioner(conf, partitioner);
 
 		long t2 = System.currentTimeMillis();

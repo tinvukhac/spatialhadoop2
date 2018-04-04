@@ -32,6 +32,8 @@ import edu.umn.cs.spatialHadoop.OperationsParams;
 import edu.umn.cs.spatialHadoop.core.Rectangle;
 import edu.umn.cs.spatialHadoop.core.ResultCollector;
 import edu.umn.cs.spatialHadoop.core.Shape;
+import edu.umn.cs.spatialHadoop.indexing.Indexer.PartitionerMap;
+import edu.umn.cs.spatialHadoop.indexing.Indexer.PartitionerReduce;
 import edu.umn.cs.spatialHadoop.indexing.Inserter.InserterMap;
 import edu.umn.cs.spatialHadoop.indexing.Inserter.InserterReduce;
 import edu.umn.cs.spatialHadoop.io.Text2;
@@ -40,139 +42,63 @@ import edu.umn.cs.spatialHadoop.operations.FileMBR;
 import edu.umn.cs.spatialHadoop.osm.OSMPoint;
 
 public class RTreeInserter {
-	private static final Log LOG = LogFactory.getLog(Indexer.class);
-	private static final Map<String, Class<? extends LocalIndexer>> LocalIndexes;
-
-	static {
-		LocalIndexes = new HashMap<String, Class<? extends LocalIndexer>>();
-		LocalIndexes.put("rtree", RTreeLocalIndexer.class);
-		LocalIndexes.put("r+tree", RTreeLocalIndexer.class);
-		LocalIndexes.put("rtree2", RTreeLocalIndexer.class);
-	}
-
-	/**
-	 * The map function that partitions the data using the configured partitioner.
-	 * Refer from Indexer class
-	 * 
-	 * @author Tin Vu
-	 *
-	 */
-	public static class RTreeInserterMap extends Mapper<Rectangle, Iterable<? extends Shape>, IntWritable, Shape> {
-
-		/** The partitioner used to partitioner the data across reducers */
-		private Partitioner partitioner;
-		/**
-		 * Whether to replicate a record to all overlapping partitions or to assign it
-		 * to only one partition
-		 */
-		private boolean replicate;
-
-		@Override
-		protected void setup(Context context) throws IOException, InterruptedException {
-			super.setup(context);
-			this.partitioner = Partitioner.getPartitioner(context.getConfiguration());
-			this.replicate = context.getConfiguration().getBoolean("replicate", false);
-		}
-
-		@Override
-		protected void map(Rectangle key, Iterable<? extends Shape> shapes, final Context context)
-				throws IOException, InterruptedException {
-			final IntWritable partitionID = new IntWritable();
-			for (final Shape shape : shapes) {
-				if (replicate) {
-					partitioner.overlapPartitions(shape, new ResultCollector<Integer>() {
-						@Override
-						public void collect(Integer r) {
-							partitionID.set(r);
-							try {
-								context.write(partitionID, shape);
-							} catch (IOException e) {
-								LOG.warn("Error checking overlapping partitions", e);
-							} catch (InterruptedException e) {
-								LOG.warn("Error checking overlapping partitions", e);
-							}
-						}
-					});
-				} else {
-					partitionID.set(partitioner.overlapPartition(shape));
-					if (partitionID.get() >= 0)
-						context.write(partitionID, shape);
-				}
-				context.progress();
-			}
-		}
-	}
-
-	public static class RTreeInserterReduce<S extends Shape> extends Reducer<IntWritable, Shape, IntWritable, Shape> {
-
-		@Override
-		protected void reduce(IntWritable partitionID, Iterable<Shape> shapes, Context context)
-				throws IOException, InterruptedException {
-			LOG.info("Working on partition #" + partitionID);
-			for (Shape shape : shapes) {
-				context.write(partitionID, shape);
-				context.progress();
-			}
-			// Indicate end of partition to close the file
-			context.write(new IntWritable(-partitionID.get() - 1), null);
-			LOG.info("Done with partition #" + partitionID);
-		}
-	}
+	
+	private static final String TEMP_APPENDING_PATH = "temp";
 
 	private static Job insertMapReduce(Path currentPath, Path insertPath, OperationsParams params) throws IOException,
 			InterruptedException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-		@SuppressWarnings("deprecation")
-		Job job = new Job(params, "RTreeInserter");
-		Configuration conf = job.getConfiguration();
-		job.setJarByClass(RTreeInserter.class);
-
-		// Set input file MBR if not already set
-		Rectangle inputMBR = (Rectangle) OperationsParams.getShape(conf, "mbr");
-		if (inputMBR == null) {
-			inputMBR = FileMBR.fileMBR(currentPath, new OperationsParams(conf));
-			OperationsParams.setShape(conf, "mbr", inputMBR);
-		}
-
-		// Load the partitioner from file
-		String index = conf.get("sindex");
-		if (index == null)
-			throw new RuntimeException("Index type is not set");
-		setLocalIndexer(conf, index);
-		RTreeFilePartitioner partitioner = new RTreeFilePartitioner();
-		partitioner.createFromMasterFile(currentPath, params);
-		Partitioner.setPartitioner(conf, partitioner);
-
-		// Set mapper and reducer
-		Shape shape = OperationsParams.getShape(conf, "shape");
-		job.setMapperClass(RTreeInserterMap.class);
-		job.setMapOutputKeyClass(IntWritable.class);
-		job.setMapOutputValueClass(shape.getClass());
-		job.setReducerClass(RTreeInserterReduce.class);
-
-		// Set input and output
-		job.setInputFormatClass(SpatialInputFormat3.class);
-		SpatialInputFormat3.setInputPaths(job, insertPath);
-		setLocalIndexer(conf, index);
-		job.setOutputFormatClass(IndexOutputFormat.class);
-		Path tempPath = new Path(currentPath, "temp");
-		IndexOutputFormat.setOutputPath(job, tempPath);
-
-		// Set number of reduce tasks according to cluster status
-		ClusterStatus clusterStatus = new JobClient(new JobConf()).getClusterStatus();
-		job.setNumReduceTasks(
-				Math.max(1, Math.min(partitioner.getPartitionCount(), (clusterStatus.getMaxReduceTasks() * 9) / 10)));
-
-		// Use multi-threading in case the job is running locally
-		conf.setInt(LocalJobRunner.LOCAL_MAX_MAPS, Runtime.getRuntime().availableProcessors());
-
-		// Start the job
-		if (conf.getBoolean("background", false)) {
-			// Run in background
-			job.submit();
-		} else {
-			job.waitForCompletion(conf.getBoolean("verbose", false));
-		}
-		return job;
+//		@SuppressWarnings("deprecation")
+//		Job job = new Job(params, "RTreeInserter");
+//		Configuration conf = job.getConfiguration();
+//		job.setJarByClass(RTreeInserter.class);
+//
+//		// Set input file MBR if not already set
+//		Rectangle inputMBR = (Rectangle) OperationsParams.getShape(conf, "mbr");
+//		if (inputMBR == null) {
+//			inputMBR = FileMBR.fileMBR(currentPath, new OperationsParams(conf));
+//			OperationsParams.setShape(conf, "mbr", inputMBR);
+//		}
+//
+//		// Load the partitioner from file
+//		String index = conf.get("sindex");
+//		if (index == null)
+//			throw new RuntimeException("Index type is not set");
+//		RTreeFilePartitioner partitioner = new RTreeFilePartitioner();
+//		partitioner.createFromMasterFile(currentPath, params);
+//		Partitioner.setPartitioner(conf, partitioner);
+//
+//		// Set mapper and reducer
+//		Shape shape = OperationsParams.getShape(conf, "shape");
+//		job.setMapperClass(Indexer.PartitionerMap.class);
+//		job.setMapOutputKeyClass(IntWritable.class);
+//		job.setMapOutputValueClass(shape.getClass());
+//		job.setReducerClass(Indexer.PartitionerReduce.class);
+//
+//		// Set input and output
+//		job.setInputFormatClass(SpatialInputFormat3.class);
+//		SpatialInputFormat3.setInputPaths(job, insertPath);
+//		job.setOutputFormatClass(IndexOutputFormat.class);
+//		Path tempPath = new Path(currentPath, "temp");
+//		IndexOutputFormat.setOutputPath(job, tempPath);
+//
+//		// Set number of reduce tasks according to cluster status
+//		ClusterStatus clusterStatus = new JobClient(new JobConf()).getClusterStatus();
+//		job.setNumReduceTasks(
+//				Math.max(1, Math.min(partitioner.getPartitionCount(), (clusterStatus.getMaxReduceTasks() * 9) / 10)));
+//
+//		// Use multi-threading in case the job is running locally
+//		conf.setInt(LocalJobRunner.LOCAL_MAX_MAPS, Runtime.getRuntime().availableProcessors());
+//
+//		// Start the job
+//		if (conf.getBoolean("background", false)) {
+//			// Run in background
+//			job.submit();
+//		} else {
+//			job.waitForCompletion(conf.getBoolean("verbose", false));
+//		}
+//		return job;
+		Path tempAppendingPath = new Path(currentPath, TEMP_APPENDING_PATH);
+		return Indexer.index(insertPath, tempAppendingPath, params);
 	}
 
 	private static void appendNewFiles(Path currentPath, OperationsParams params)
@@ -180,7 +106,7 @@ public class RTreeInserter {
 		// Read master file to get all file names
 		final byte[] NewLine = new byte[] { '\n' };
 		ArrayList<Partition> currentPartitions = MetadataUtil.getPartitions(currentPath, params);
-		ArrayList<Partition> insertPartitions = MetadataUtil.getPartitions(new Path(currentPath, "temp"), params);
+		ArrayList<Partition> insertPartitions = MetadataUtil.getPartitions(new Path(currentPath, TEMP_APPENDING_PATH), params);
 
 		// System.out.println("Insert partition size = " + insertPartitions.size());
 
@@ -189,14 +115,14 @@ public class RTreeInserter {
 		String sindex = params.get("sindex");
 
 		Path currentMasterPath = new Path(currentPath, "_master." + sindex);
-		Path insertMasterPath = new Path(currentPath, "temp/_master." + sindex);
+		Path insertMasterPath = new Path(currentPath, TEMP_APPENDING_PATH + "/_master." + sindex);
 
 		ArrayList<Partition> partitionsToAppend = new ArrayList<Partition>();
 		for (Partition insertPartition : insertPartitions) {
 			for (Partition currentPartition : currentPartitions) {
 				if (insertPartition.cellId == currentPartition.cellId) {
 					currentPartition.expand(insertPartition);
-					if(!MetadataUtil.isContainedPartition(partitionsToAppend, currentPartition)) {
+					if (!MetadataUtil.isContainedPartition(partitionsToAppend, currentPartition)) {
 						partitionsToAppend.add(currentPartition);
 					}
 				}
@@ -205,16 +131,16 @@ public class RTreeInserter {
 
 		// Append files in temp directory to corresponding files in current path
 		for (Partition partition : partitionsToAppend) {
-//			System.out.println("Appending to " + partition.filename);
+			// System.out.println("Appending to " + partition.filename);
 			FSDataOutputStream out;
 			Path filePath = new Path(currentPath, partition.filename);
-			if(!fs.exists(filePath)) {
+			if (!fs.exists(filePath)) {
 				out = fs.create(filePath);
 			} else {
 				out = fs.append(filePath);
 			}
 			BufferedReader br = new BufferedReader(
-					new InputStreamReader(fs.open(new Path(currentPath, "temp/" + partition.filename))));
+					new InputStreamReader(fs.open(new Path(currentPath, TEMP_APPENDING_PATH + "/" + partition.filename))));
 			String line;
 			PrintWriter writer = new PrintWriter(out);
 			do {
@@ -244,15 +170,9 @@ public class RTreeInserter {
 
 		wktOut.close();
 		masterOut.close();
-		fs.delete(new Path(currentPath, "temp"));
+		fs.delete(new Path(currentPath, TEMP_APPENDING_PATH));
 		fs.close();
 		System.out.println("Complete!");
-	}
-
-	private static void setLocalIndexer(Configuration conf, String sindex) {
-		Class<? extends LocalIndexer> localIndexerClass = LocalIndexes.get(sindex);
-		if (localIndexerClass != null)
-			conf.setClass(LocalIndexer.LocalIndexerClass, localIndexerClass, LocalIndexer.class);
 	}
 
 	private static void printUsage() {
@@ -269,66 +189,68 @@ public class RTreeInserter {
 		insertMapReduce(currentPath, insertPath, params);
 		appendNewFiles(currentPath, params);
 	}
-	
-	public static void append(Path currentPath, String localInsertPath, OperationsParams params) throws IOException {
-		long t1 = System.currentTimeMillis();
-		// Create partitioner
-		RTreeFilePartitioner partitioner = new RTreeFilePartitioner();
-		partitioner.createFromMasterFile(currentPath, params);
-		
-		// Read the append file and assign record to a map of (cellId) -> {list of records}
-		HashMap<Integer, List<Shape>> map = new HashMap<Integer, List<Shape>>();
-		BufferedReader br = new BufferedReader(new FileReader(localInsertPath));
-		try {
-		    String line = br.readLine();
 
-		    while (line != null) {
-		    	// Convert line to shape
-		    	Text text = new Text(line);
-		    	OSMPoint shape = new OSMPoint();
-		    	shape.fromText(text);
-		    	// Find the corresponding cellId
-		    	int partitionId = partitioner.overlapPartition(shape);
-		    	if(map.get(partitionId) == null) {
-		    		map.put(partitionId, new ArrayList<Shape>());
-		    	}
-		    	map.get(partitionId).add(shape);
-		    	
-		    	// Read next record
-		        line = br.readLine();
-		    }
-		} finally {
-		    br.close();
-		}
-		
-		// Append the mapped records to HDFS files
-		
-		
-		long t2 = System.currentTimeMillis();
-		System.out.println("Total appending time in millis " + (t2 - t1));
-	}
+//	public static void append(Path currentPath, String localInsertPath, OperationsParams params) throws IOException {
+//		long t1 = System.currentTimeMillis();
+//		// Create partitioner
+//		RTreeFilePartitioner partitioner = new RTreeFilePartitioner();
+//		partitioner.createFromMasterFile(currentPath, params);
+//
+//		// Read the append file and assign record to a map of (cellId) -> {list of
+//		// records}
+//		HashMap<Integer, List<Shape>> map = new HashMap<Integer, List<Shape>>();
+//		BufferedReader br = new BufferedReader(new FileReader(localInsertPath));
+//		try {
+//			String line = br.readLine();
+//
+//			while (line != null) {
+//				// Convert line to shape
+//				Text text = new Text(line);
+//				OSMPoint shape = new OSMPoint();
+//				shape.fromText(text);
+//				// Find the corresponding cellId
+//				int partitionId = partitioner.overlapPartition(shape);
+//				if (map.get(partitionId) == null) {
+//					map.put(partitionId, new ArrayList<Shape>());
+//				}
+//				map.get(partitionId).add(shape);
+//
+//				// Read next record
+//				line = br.readLine();
+//			}
+//		} finally {
+//			br.close();
+//		}
+//
+//		// Append the mapped records to HDFS files
+//
+//		long t2 = System.currentTimeMillis();
+//		System.out.println("Total appending time in millis " + (t2 - t1));
+//	}
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException, InterruptedException,
 			InstantiationException, IllegalAccessException {
 		// TODO Auto-generated method stub
 		final OperationsParams params = new OperationsParams(new GenericOptionsParser(args));
-//		Path[] inputFiles = params.getPaths();
-//
-//		if (!params.checkInput() || (inputFiles.length != 2)) {
-//			printUsage();
-//			System.exit(1);
-//		}
-//
-//		Path currentPath = inputFiles[0];
-//		Path insertPath = inputFiles[1];
-//		System.out.println("Current path: " + currentPath);
-//		System.out.println("Insert path: " + insertPath);
-//		insertMapReduce(currentPath, insertPath, params);
-//		appendNewFiles(currentPath, params);
-		
+		// Path[] inputFiles = params.getPaths();
+		//
+		// if (!params.checkInput() || (inputFiles.length != 2)) {
+		// printUsage();
+		// System.exit(1);
+		// }
+		//
+		// Path currentPath = inputFiles[0];
+		// Path insertPath = inputFiles[1];
+		// System.out.println("Current path: " + currentPath);
+		// System.out.println("Insert path: " + insertPath);
+		// insertMapReduce(currentPath, insertPath, params);
+		// appendNewFiles(currentPath, params);
+
+		params.setBoolean("isAppending", true);
 		String currentPathString = params.get("current");
 		String appendPathString = params.get("append");
 		Path currentPath = new Path(currentPathString);
-		append(currentPath, appendPathString, params);
+		Path appendPath = new Path(appendPathString);
+		append(currentPath, appendPath, params);
 	}
 }
