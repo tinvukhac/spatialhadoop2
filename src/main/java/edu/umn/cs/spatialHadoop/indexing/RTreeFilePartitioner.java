@@ -129,6 +129,7 @@ public class RTreeFilePartitioner extends Partitioner {
 		for(Partition p: partitions) {
 			CellInfo tempCellInfo = new CellInfo();
 			tempCellInfo.set(p.cellMBR);
+			System.out.println(p.cellMBR.toString());
 			tempCellInfo.cellId = p.cellId;
 			this.cells.add(tempCellInfo);
 		}
