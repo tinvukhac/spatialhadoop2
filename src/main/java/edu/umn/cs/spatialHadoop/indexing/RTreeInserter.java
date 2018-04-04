@@ -97,6 +97,8 @@ public class RTreeInserter {
 //			job.waitForCompletion(conf.getBoolean("verbose", false));
 //		}
 //		return job;
+		params.setBoolean("isAppending", true);
+		params.set("currentPath", currentPath.toString());
 		Path tempAppendingPath = new Path(currentPath, TEMP_APPENDING_PATH);
 		return Indexer.index(insertPath, tempAppendingPath, params);
 	}
@@ -186,7 +188,6 @@ public class RTreeInserter {
 
 	public static void append(Path currentPath, Path insertPath, OperationsParams params) throws ClassNotFoundException,
 			InstantiationException, IllegalAccessException, IOException, InterruptedException {
-		params.setBoolean("isAppending", true);
 		insertMapReduce(currentPath, insertPath, params);
 //		appendNewFiles(currentPath, params);
 	}

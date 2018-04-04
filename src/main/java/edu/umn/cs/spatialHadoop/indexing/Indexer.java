@@ -189,8 +189,9 @@ public class Indexer {
 		Partitioner partitioner;
 		boolean isAppending = paramss.getBoolean("isAppending", false);
 		if(isAppending) {
+			Path currentPath = new Path(paramss.get("currentPath"));
 			partitioner = new RTreeFilePartitioner();
-			((RTreeFilePartitioner) partitioner).createFromMasterFile(inPath, paramss);
+			((RTreeFilePartitioner) partitioner).createFromMasterFile(currentPath, paramss);
 		} else {
 			partitioner = createPartitioner(inPath, outPath, conf, index);
 		}
