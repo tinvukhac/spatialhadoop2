@@ -25,7 +25,7 @@ import edu.umn.cs.spatialHadoop.core.Shape;
 public class RTreeFilePartitioner extends Partitioner {
 
 	private static final double MINIMUM_EXPANSION = Double.MAX_VALUE;
-	private static final int MAXIMUM_NEAREST_CELLS = 3;
+	private static final int MAXIMUM_NEAREST_CELLS = 5;
 	protected ArrayList<CellInfo> cells;
 	protected Map<Integer, CellInfo> cellsMap;
 	private RTree<Integer, Geometry> cellsTree;
@@ -120,7 +120,8 @@ public class RTreeFilePartitioner extends Partitioner {
 	 */
 	public void createFromMasterFile(Path inPath, OperationsParams params) throws IOException {
 		this.cells = new ArrayList<CellInfo>();
-
+		
+		System.out.println("Creating cell from master file");
 		ArrayList<Partition> partitions = MetadataUtil.getPartitions(inPath, params);
 		for(Partition p: partitions) {
 			CellInfo tempCellInfo = new CellInfo();
