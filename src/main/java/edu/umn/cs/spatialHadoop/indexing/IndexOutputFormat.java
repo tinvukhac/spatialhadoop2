@@ -315,8 +315,9 @@ public class IndexOutputFormat<S extends Shape>
         System.out.println("cellMBR = " + partition.cellMBR.toString());
         // Set the rectangle to the opposite universe so that we can keep
         // expanding it to get the MBR of this partition
-        partition.set(Double.MAX_VALUE, Double.MAX_VALUE,
-            -Double.MAX_VALUE, -Double.MAX_VALUE);
+//        partition.set(Double.MAX_VALUE, Double.MAX_VALUE,
+//            -Double.MAX_VALUE, -Double.MAX_VALUE);
+        partition.set(-180,-90,180,83);
         // Store in the hashtables for further user
         partitionsOutput.put(id,  out);
         partitionsInfo.put(id, partition);
