@@ -1,45 +1,21 @@
 package edu.umn.cs.spatialHadoop.indexing;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.ClusterStatus;
-import org.apache.hadoop.mapred.JobClient;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.LocalJobRunner;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.util.GenericOptionsParser;
 import edu.umn.cs.spatialHadoop.OperationsParams;
-import edu.umn.cs.spatialHadoop.core.Rectangle;
-import edu.umn.cs.spatialHadoop.core.ResultCollector;
-import edu.umn.cs.spatialHadoop.core.Shape;
-import edu.umn.cs.spatialHadoop.indexing.Indexer.PartitionerMap;
-import edu.umn.cs.spatialHadoop.indexing.Indexer.PartitionerReduce;
-import edu.umn.cs.spatialHadoop.indexing.Inserter.InserterMap;
-import edu.umn.cs.spatialHadoop.indexing.Inserter.InserterReduce;
 import edu.umn.cs.spatialHadoop.io.Text2;
-import edu.umn.cs.spatialHadoop.mapreduce.SpatialInputFormat3;
-import edu.umn.cs.spatialHadoop.operations.FileMBR;
-import edu.umn.cs.spatialHadoop.osm.OSMPoint;
 
 public class RTreeInserter {
 	

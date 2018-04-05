@@ -29,22 +29,17 @@ public class Partition extends CellInfo {
   /**Total size of data in this partition in bytes (uncompressed)*/
   public long size;
   
-  /**The MBR of cell. This is different to the MBR of data which tightly fit to cell data*/
-  public Rectangle cellMBR = new Rectangle();
-  
   public Partition() {}
   
-  public Partition(String filename, CellInfo cell, Rectangle cellMBR) {
+  public Partition(String filename, CellInfo cell) {
     this.filename = filename;
     super.set(cell);
-    this.cellMBR = new Rectangle(cellMBR);
   }
   
   public Partition(Partition other) {
     this.filename = other.filename;
     this.recordCount = other.recordCount;
     this.size = other.size;
-    this.cellMBR.set(other.cellMBR);
     super.set((CellInfo)other);
   }
 
@@ -54,7 +49,6 @@ public class Partition extends CellInfo {
     out.writeUTF(filename);
     out.writeLong(recordCount);
     out.writeLong(size);
-    cellMBR.write(out);
   }
   
   @Override
@@ -63,17 +57,11 @@ public class Partition extends CellInfo {
     filename = in.readUTF();
     this.recordCount = in.readLong();
     this.size = in.readLong();
-    cellMBR.readFields(in);
   }
   
   @Override
   public Text toText(Text text) {
     super.toText(text);
-    text.append(new byte[] {','}, 0, 1);
-    
-    Text cellMBRText = new Text();
-    cellMBR.toText(cellMBRText);
-    text.append(cellMBRText.getBytes(), 0, cellMBRText.getLength());
     text.append(new byte[] {','}, 0, 1);
     
     TextSerializerHelper.serializeLong(recordCount, text, ',');
@@ -89,8 +77,6 @@ public class Partition extends CellInfo {
   @Override
   public void fromText(Text text) {
     super.fromText(text);
-    text.set(text.getBytes(), 1, text.getLength() - 1); // Skip comma
-    cellMBR.fromText(text);
     text.set(text.getBytes(), 1, text.getLength() - 1); // Skip comma
     this.recordCount = TextSerializerHelper.consumeLong(text, ',');
     this.size = TextSerializerHelper.consumeLong(text, ',');
@@ -117,7 +103,6 @@ public class Partition extends CellInfo {
   public void expand(Partition p) {
     super.expand(p);
     // accumulate size
-    this.cellMBR.expand(p.cellMBR);
     this.size += p.size;
     this.recordCount += p.recordCount;
   }

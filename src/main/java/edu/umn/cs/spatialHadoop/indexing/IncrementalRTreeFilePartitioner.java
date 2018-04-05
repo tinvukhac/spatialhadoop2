@@ -220,7 +220,7 @@ public class IncrementalRTreeFilePartitioner extends Partitioner {
 		// long t1 = System.currentTimeMillis();
 		// final Rectangle inMBR = (Rectangle) OperationsParams.getShape(job,
 		// "mbr");
-		final Rectangle inMBR = partition.cellMBR;
+		final Rectangle inMBR = partition.getMBR();
 		// Determine number of partitions
 		long inSize = 0;
 		inSize += FileUtil.getPathSize(in.getFileSystem(job), in);
@@ -308,7 +308,7 @@ public class IncrementalRTreeFilePartitioner extends Partitioner {
 		// int cellId = maxCellId + 1;
 		for (Rectangle r : rects) {
 			CellInfo cell = new CellInfo(1, r);
-			cells.add(new Partition(partition.filename, cell, r));
+			cells.add(new Partition(partition.filename, cell));
 			// cellId++;
 		}
 		// maxCellId = maxCellId + rects.size();

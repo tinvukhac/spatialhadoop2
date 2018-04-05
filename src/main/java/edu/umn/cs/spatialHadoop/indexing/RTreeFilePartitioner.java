@@ -132,7 +132,7 @@ public class RTreeFilePartitioner extends Partitioner {
 		ArrayList<Partition> partitions = MetadataUtil.getPartitions(inPath, params);
 		for(Partition p: partitions) {
 			CellInfo tempCellInfo = new CellInfo();
-			tempCellInfo.set(p.cellMBR);
+			tempCellInfo.set(p.getMBR());
 			tempCellInfo.cellId = p.cellId;
 			this.cells.add(tempCellInfo);
 			cellsMap.put(tempCellInfo.cellId, tempCellInfo);

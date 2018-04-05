@@ -424,10 +424,9 @@ public class GridRecordWriter<S extends Shape> implements ShapeRecordWriter<S> {
     if (pack)
       cell = new CellInfo(cell.cellId, cell.getIntersection(dataMbr[cellIndex]));
 
-    Rectangle cellMBR = new Rectangle(cells[cellIndex]);
     closeCellBackground(intermediateCellPath[cellIndex],
         getFinalCellPath(cellIndex), intermediateCellStreams[cellIndex],
-        masterFile, cell, cellMBR, intermediateCellRecordCount[cellIndex], intermediateCellSize[cellIndex]);
+        masterFile, cell, intermediateCellRecordCount[cellIndex], intermediateCellSize[cellIndex]);
     dataMbr[cellIndex] = new Rectangle(Double.MAX_VALUE, Double.MAX_VALUE,
         -Double.MAX_VALUE, -Double.MAX_VALUE);
     intermediateCellPath[cellIndex] = null;
@@ -451,7 +450,6 @@ public class GridRecordWriter<S extends Shape> implements ShapeRecordWriter<S> {
   protected void closeCellBackground(final Path intermediateCellPath,
       final Path finalCellPath, final OutputStream intermediateCellStream,
       final OutputStream masterFile, final CellInfo partitionInfo,
-      final Rectangle reallyCellMBR,
       final long recordCount, final long cellSize) throws IOException {
     
     Thread closingThread = new Thread() {
@@ -464,7 +462,7 @@ public class GridRecordWriter<S extends Shape> implements ShapeRecordWriter<S> {
 
           // Write a line to the master file including file name and cellInfo
           if (masterFile != null) {
-            Partition partition = new Partition(finalfinalCellPath.getName(), partitionInfo, reallyCellMBR);
+            Partition partition = new Partition(finalfinalCellPath.getName(), partitionInfo);
             partition.recordCount = recordCount;
             partition.size = cellSize;
             Text line = partition.toText(new Text());
