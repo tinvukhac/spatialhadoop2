@@ -37,6 +37,7 @@ import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.LineReader;
 
 import edu.umn.cs.spatialHadoop.OperationsParams;
+import edu.umn.cs.spatialHadoop.core.CellInfo;
 import edu.umn.cs.spatialHadoop.core.Point;
 import edu.umn.cs.spatialHadoop.core.Rectangle;
 import edu.umn.cs.spatialHadoop.core.ResultCollector;
@@ -190,8 +191,14 @@ public class Indexer {
 		boolean isAppending = paramss.getBoolean("isAppending", false);
 		if(isAppending) {
 			Path currentPath = new Path(paramss.get("currentPath"));
-			partitioner = new RTreeFilePartitioner();
-			((RTreeFilePartitioner) partitioner).createFromMasterFile(currentPath, paramss);
+//			partitioner = new RTreeFilePartitioner();
+//			((RTreeFilePartitioner) partitioner).createFromMasterFile(currentPath, paramss);
+			ArrayList<Partition> partitions = MetadataUtil.getPartitions(currentPath, paramss);
+			CellInfo[] cells = new CellInfo[partitions.size()];
+			for(int i = 0; i < cells.length; i++) {
+				cells[i] = new CellInfo(partitions.get(i));
+			}
+			partitioner = new CellPartitioner(cells);
 		} else {
 			partitioner = createPartitioner(inPath, outPath, conf, index);
 		}
