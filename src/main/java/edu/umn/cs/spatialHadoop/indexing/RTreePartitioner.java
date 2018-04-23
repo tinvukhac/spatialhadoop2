@@ -223,7 +223,7 @@ public class RTreePartitioner extends Partitioner {
 				for (CellInfo cell : nearestCells) {
 					CellInfo tempCell = new CellInfo(cell);
 					tempCell.expand(shape);
-					double expansionArea = tempCell.getSize() - cell.getSize();
+					double expansionArea = tempCell.area() - cell.area();
 					if (expansionArea < minimumExpansion) {
 						minimumExpansion = expansionArea;
 						minimumCell = cell;

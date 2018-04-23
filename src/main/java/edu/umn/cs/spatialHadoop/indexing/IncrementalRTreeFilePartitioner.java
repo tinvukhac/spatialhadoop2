@@ -350,7 +350,7 @@ public class IncrementalRTreeFilePartitioner extends Partitioner {
 			for (CellInfo cell : partitionCells) {
 				CellInfo tempCell = new CellInfo(cell);
 				tempCell.expand(shape);
-				double expansionArea = tempCell.getSize() - cell.getSize();
+				double expansionArea = tempCell.area() - cell.area();
 				if (expansionArea < minimumExpansion) {
 					minimumExpansion = expansionArea;
 					minimumCell = cell;
@@ -399,7 +399,7 @@ public class IncrementalRTreeFilePartitioner extends Partitioner {
 				for (CellInfo cell : partitionCells) {
 					CellInfo tempCell = new CellInfo(cell);
 					tempCell.expand(shape);
-					double expansionArea = tempCell.getSize() - cell.getSize();
+					double expansionArea = tempCell.area() - cell.area();
 					if (expansionArea < minimumExpansion) {
 						minimumExpansion = expansionArea;
 						minimumCell = cell;

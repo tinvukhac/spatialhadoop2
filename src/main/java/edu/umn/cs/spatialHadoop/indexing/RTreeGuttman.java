@@ -6,10 +6,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.io.IntWritable;
 import sun.security.krb5.internal.crypto.Des;
 
-import java.io.Closeable;
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 /**
@@ -631,26 +628,16 @@ public class RTreeGuttman implements Closeable {
    * @see #noInsert(double, double, double, double)
    */
   protected void initializeHollowRTree(double[] x1, double[] y1, double[] x2, double[] y2) {
-    // 1- Create a regular R-tree with the given rectangles as data entries.
+    // Create a regular R-tree with the given rectangles as data entries.
     initializeFromRects(x1, y1, x2, y2);
-
-    // 2- Convert all data entries to empty leaf nodes
-    for (int i = 0; i < numEntries; i++)
-      isLeaf.set(i, true);
-
-    for (int i = numEntries; i < numNodes + numEntries; i++)
-      isLeaf.set(i, false);
-
-    numNodes += numEntries;
-    numEntries = 0;
 
     // Make sure we have a room for an extra object which will be used in noInsert
     makeRoomForOneMoreObject();
   }
 
   /**
-   * Simulates an insertion of a record and returns the ID of the leaf node
-   * it will end up in (without really inserting it).
+   * Simulates an insertion of a record and returns the ID of the object that either
+   * contains the given boundaries or will be its sibling.
    * @param x1
    * @param y1
    * @param x2
@@ -664,9 +651,11 @@ public class RTreeGuttman implements Closeable {
     x2s[i] = x2;
     y2s[i] = y2;
 
-    // Descend fro the root until reaching a leaf node
+    // Descend from the root until reaching a data entry
+    // The range of IDs for data entries is [0, numEntries[
+    // All node IDs is in the rnage [numEntries, numEntries + numNodes[
     int p = root;
-    while (!isLeaf.get(p))
+    while (p >= numOfDataEntries())
       p = chooseSubtree(i, p);
 
     // Return the index of the leaf node without really inserting the element
@@ -855,6 +844,9 @@ public class RTreeGuttman implements Closeable {
    * A class that holds information about one node in the tree.
    */
   public static class Node {
+    /**The internal ID of the node*/
+    public int id;
+
     /**Whether this is a leaf node or not*/
     public boolean isLeaf;
 
@@ -864,27 +856,23 @@ public class RTreeGuttman implements Closeable {
     protected Node(){}
   }
 
-  protected class LeafNodeIterable implements Iterable<Node>, Iterator<Node> {
+  protected class NodeIterable implements Iterable<Node>, Iterator<Node> {
     /**The ID of the next node to be returned*/
     protected int iNextNode;
 
     /**Current node pointed by the iterator*/
     protected Node currentNode;
 
-    protected LeafNodeIterable() {
+    protected NodeIterable() {
       currentNode = new Node();
-      // This iterator only returns leaf nodes
-      currentNode.isLeaf = true;
       iNextNode = numEntries - 1;
       prefetchNext();
     }
 
     protected void prefetchNext() {
-      if (iNextNode >= x1s.length)
+      if (iNextNode >= numEntries + numNodes)
         return;
-      do {
-        iNextNode++;
-      } while (iNextNode < x1s.length && !isLeaf.get(iNextNode));
+      iNextNode++;
     }
 
     @Override
@@ -894,7 +882,7 @@ public class RTreeGuttman implements Closeable {
 
     @Override
     public boolean hasNext() {
-      return iNextNode < RTreeGuttman.this.x1s.length;
+      return iNextNode < numEntries + numNodes;
     }
 
     @Override
@@ -903,12 +891,24 @@ public class RTreeGuttman implements Closeable {
       currentNode.y1 = y1s[iNextNode];
       currentNode.x2 = x2s[iNextNode];
       currentNode.y2 = y2s[iNextNode];
+      currentNode.isLeaf = isLeaf.get(iNextNode);
+      currentNode.id = iNextNode;
       prefetchNext();
       return currentNode;
     }
 
     public void remove() {
       throw new RuntimeException("Not supported");
+    }
+  }
+
+  protected class LeafNodeIterable extends NodeIterable {
+    protected void prefetchNext() {
+      if (iNextNode >= numEntries + numNodes)
+        return;
+      do {
+        iNextNode++;
+      } while (iNextNode < numEntries + numNodes && !isLeaf.get(iNextNode));
     }
   }
 
@@ -1078,19 +1078,18 @@ public class RTreeGuttman implements Closeable {
       this.children.add(null);
 
     // Read the tree structure and keep it all in memory
-    // Store root MBR
-    x1s[root] = rootx1;
-    y1s[root] = rooty1;
-    x2s[root] = rootx2;
-    y2s[root] = rooty2;
-    // Read other nodes information
-
     // First, scan the nodes once to map node offsets to IDs
     // Map the offset of some nodes to their index in the node list
     Map<Integer, Integer> nodeOffsetToIndex = new HashMap<Integer, Integer>();
     in.seek(treeStartOffset + treeStructureOffset);
     int nodeID = numEntries;
     this.root = nodeID; // First node is always the root
+    // Store root MBR
+    x1s[root] = rootx1;
+    y1s[root] = rooty1;
+    x2s[root] = rootx2;
+    y2s[root] = rooty2;
+
     while (nodeID < this.numNodes + this.numEntries) {
       int nodeOffset = (int) (in.getPos() - treeStartOffset);
       nodeOffsetToIndex.put(nodeOffset, nodeID);
@@ -1133,4 +1132,20 @@ public class RTreeGuttman implements Closeable {
       in.close();
   }
 
+  /**
+   * Writes all nodes of the tree in a WKT format to be visualized in QGIS.
+   * @param out
+   */
+  public void toWKT(PrintStream out) {
+    for (Node node : new NodeIterable()) {
+      out.printf("%d\tPOLYGON((%f %f, %f %f, %f %f, %f %f, %f %f))\n",
+          node.id,
+          node.x1, node.y1,
+          node.x1, node.y2,
+          node.x2, node.y2,
+          node.x2, node.y1,
+          node.x1, node.y1
+      );
+    }
+  }
 }

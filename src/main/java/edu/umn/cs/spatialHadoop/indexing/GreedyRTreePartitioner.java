@@ -82,7 +82,7 @@ public class GreedyRTreePartitioner extends Partitioner {
 			for(CellInfo cell: this.cells) {
 				CellInfo tempCell = new CellInfo(cell);
 				tempCell.expand(shape);
-				double expansionArea = tempCell.getSize() - cell.getSize();
+				double expansionArea = tempCell.area() - cell.area();
 				if(expansionArea < minimumExpansion) {
 					minimumExpansion = expansionArea;
 					minimumCell = cell;
@@ -105,7 +105,7 @@ public class GreedyRTreePartitioner extends Partitioner {
 		for(CellInfo cell: this.cells) {
 			CellInfo tempCell = new CellInfo(cell);
 			tempCell.expand(shape);
-			double expansionArea = tempCell.getSize() - cell.getSize();
+			double expansionArea = tempCell.area() - cell.area();
 			if(expansionArea < minimumExpansion) {
 				minimumExpansion = expansionArea;
 				minimumCell = cell;

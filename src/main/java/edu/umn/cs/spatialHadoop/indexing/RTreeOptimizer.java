@@ -65,7 +65,7 @@ public class RTreeOptimizer {
 				mbr.expand(p);
 			}
 		}
-		double querySize = 0.000001 * Math.sqrt(mbr.getSize());
+		double querySize = 0.000001 * Math.sqrt(mbr.area());
 		
 		ArrayList<Partition> remainingPartitions = new ArrayList<Partition>();
 		ArrayList<Partition> splitPartitions = new ArrayList<Partition>();
@@ -105,7 +105,7 @@ public class RTreeOptimizer {
 				groupBlocks += p.getNumberOfBlock(blockSize);
 				tempPartition.expand(p);
 			}
-			double groupArea = tempPartition.getSize();
+			double groupArea = tempPartition.area();
 
 			costAfter += Math.pow((Math.sqrt(groupArea / groupBlocks) + querySize), 2) * groupBlocks;
 		}
@@ -168,10 +168,10 @@ public class RTreeOptimizer {
 	}
 	
 	private static double computeReducedArea(ArrayList<Partition> splittingPartitions, Partition partition) {
-		double reducedArea = partition.getSize();
+		double reducedArea = partition.area();
 		for(Partition p: splittingPartitions) {
 			if(p.isIntersected(partition)) {
-				reducedArea += p.getIntersection(partition).getSize();
+				reducedArea += p.getIntersection(partition).area();
 			}
 		}
 		return reducedArea;
