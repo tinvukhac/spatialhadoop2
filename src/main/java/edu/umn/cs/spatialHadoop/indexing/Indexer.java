@@ -462,6 +462,7 @@ public class Indexer {
 		// Job job = indexMapReduce(inPaths, outPath, p, params);
 		// return job;
 		// }
+		System.out.println("initializeIndexers");
 		Partitioner p = initializeIndexers(inPaths, outPath, params);
 		if (OperationsParams.isLocal(new JobConf(params), inPaths)) {
 			indexLocal(inPaths, outPath, p, params);
@@ -504,6 +505,7 @@ public class Indexer {
 			conf.setClass(LocalIndex.LocalIndexClass, spatialIndex.lindex, LocalIndex.class);
 
 		long t1 = System.currentTimeMillis();
+		System.out.println("gindex = " + spatialIndex.gindex);
 		Partitioner partitioner = initializeGlobalIndex(inPaths, outPath, conf, spatialIndex.gindex);
 		Partitioner.setPartitioner(conf, partitioner);
 
