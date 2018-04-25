@@ -140,6 +140,7 @@ public class IndexInserter {
 			tempPath = new Path(currentPath.getParent(), Integer.toString((int) (Math.random() * 1000000)));
 		} while (fs.exists(tempPath));
 
+		params.set("currentPath", currentPath.toString());
 		Indexer.index(insertPath, tempPath, params);
 
 		// Read master file to get all file names
