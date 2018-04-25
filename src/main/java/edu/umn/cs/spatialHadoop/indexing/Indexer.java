@@ -463,9 +463,9 @@ public class Indexer {
 		// return job;
 		// }
 		System.out.println("initializeIndexers");
-		Partitioner p = initializeIndexers(inPaths, outPath, params);
+//		Partitioner p = initializeIndexers(inPaths, outPath, params);
 		if (OperationsParams.isLocal(new JobConf(params), inPaths)) {
-			indexLocal(inPaths, outPath, p, params);
+//			indexLocal(inPaths, outPath, p, params);
 			return null;
 		} else {
 			Job job = indexMapReduce(inPaths, outPath, params);
