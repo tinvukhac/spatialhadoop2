@@ -224,7 +224,7 @@ public class PartitionSelector {
 		} else if(type == OptimizerType.IncrementalRTree) {
 			ArrayList<Partition> overflowPartitions = getOverflowPartitions(path, params);
 			for(Partition partition: overflowPartitions) {
-				ArrayList<Partition> group = new ArrayList<>();
+				ArrayList<Partition> group = new ArrayList<Partition>();
 				group.add(partition);
 				splitGroups.add(group);
 			}

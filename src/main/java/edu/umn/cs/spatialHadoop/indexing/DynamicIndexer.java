@@ -32,6 +32,7 @@ public class DynamicIndexer {
 		ArrayList<ArrayList<Partition>> splitGroups = PartitionSelector.getSplitGroups(currentPath, params);
 		long t3 = System.currentTimeMillis();
 		System.out.println("Total optimization time in millis " + (t3 - t2));
+		System.out.println("Number of groups = " + splitGroups.size());
 		
 		// Partition splitting
 		PartitionSplitter.reorganize(currentPath, splitGroups, params);
