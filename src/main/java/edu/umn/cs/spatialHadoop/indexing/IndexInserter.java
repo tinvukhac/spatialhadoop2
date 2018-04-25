@@ -145,7 +145,8 @@ public class IndexInserter {
 
 		// Read master file to get all file names
 		ArrayList<Partition> currentPartitions = MetadataUtil.getPartitions(currentPath, params);
-		ArrayList<Partition> insertPartitions = MetadataUtil.getPartitions(tempPath, params);
+		Path tempMasterPath = new Path(tempPath, "_master.cells");
+		ArrayList<Partition> insertPartitions = MetadataUtil.getPartitions(tempMasterPath);
 
 		ArrayList<Partition> partitionsToAppend = new ArrayList<Partition>();
 		for (Partition insertPartition : insertPartitions) {
