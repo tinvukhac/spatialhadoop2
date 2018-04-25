@@ -152,7 +152,7 @@ public class IndexInserter {
 		for (Partition insertPartition : insertPartitions) {
 			for (Partition currentPartition : currentPartitions) {
 				if (insertPartition.cellId == currentPartition.cellId) {
-					insertPartition.expand(currentPartition);
+					currentPartition.expand(insertPartition);
 					if (!MetadataUtil.isContainedPartition(partitionsToAppend, currentPartition)) {
 						partitionsToAppend.add(insertPartition);
 					}

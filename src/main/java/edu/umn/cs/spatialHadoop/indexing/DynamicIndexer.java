@@ -24,7 +24,7 @@ public class DynamicIndexer {
 		
 		// Data flushing
 		long t1 = System.currentTimeMillis();
-		IndexInserter.insert(currentPath, appendPath, params);
+//		IndexInserter.insert(currentPath, appendPath, params);
 		long t2 = System.currentTimeMillis();
 		System.out.println("Total appending time in millis " + (t2 - t1));
 		

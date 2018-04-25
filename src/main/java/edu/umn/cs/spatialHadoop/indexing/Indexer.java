@@ -321,6 +321,7 @@ public class Indexer {
 			sampleParams.setClass("outshape", Point.class, Shape.class);
 			final String[] sample = Sampler.takeSample(ins, sampleParams);
 			Point[] samplePoints = new Point[sample.length];
+			System.out.println("samplePoints length = " + samplePoints.length);
 			for (int i = 0; i < sample.length; i++) {
 				samplePoints[i] = new Point();
 				samplePoints[i].fromText(new Text(sample[i]));

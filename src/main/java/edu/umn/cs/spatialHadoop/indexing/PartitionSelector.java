@@ -10,56 +10,58 @@ import edu.umn.cs.spatialHadoop.OperationsParams;
 import edu.umn.cs.spatialHadoop.core.Rectangle;
 
 public class PartitionSelector {
-	
+
 	public enum OptimizerType {
-		MaximumReducedCost,
-		MaximumReducedArea,
-		IncrementalRTree,
-		LSMRTree
+		MaximumReducedCost, MaximumReducedArea, IncrementalRTree, LSMRTree
 	}
-	
+
 	// Incremental RTree optimizer
 	public static ArrayList<Partition> getOverflowPartitions(Path path, OperationsParams params) throws IOException {
 		ArrayList<Partition> overflowPartitions = new ArrayList<Partition>();
-		
+
 		ArrayList<Partition> partitions = MetadataUtil.getPartitions(path, params);
-		
+		System.out.println("Number of partitions in current index: " + partitions.size());
+
 		Configuration conf = new Configuration();
 		int blockSize = Integer.parseInt(conf.get("dfs.blocksize"));
 		double overflowRate = Double.parseDouble(params.get("overflow_rate"));
-		double overflowSize = blockSize * overflowRate;
-		
-		for(Partition p: partitions) {
-			if(p.size > overflowSize) {
+		long overflowSize = Math.round(blockSize * overflowRate);
+		System.out.println(String.format("Block size: %d; overflow rate: %f, overflow size = %d", blockSize,
+				overflowRate, overflowSize));
+
+		for (Partition p : partitions) {
+//			System.out.println("p size = " + p.size);
+			if (p.size > overflowSize) {
 				overflowPartitions.add(p);
 			}
 		}
-		
+
 		return overflowPartitions;
 	}
-	
+
 	// Greedy algorithm that maximize the reduced range query cost
 	@SuppressWarnings("unchecked")
-	private static ArrayList<ArrayList<Partition>> getSplitGroupsWithMaximumReducedCost(ArrayList<Partition> partitions, OperationsParams params) throws IOException {
+	private static ArrayList<ArrayList<Partition>> getSplitGroupsWithMaximumReducedCost(ArrayList<Partition> partitions,
+			OperationsParams params) throws IOException {
 		ArrayList<ArrayList<Partition>> splitGroups = new ArrayList<>();
-		
+
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(conf);
 		int blockSize = Integer.parseInt(conf.get("dfs.blocksize"));
 		double overflowRate = Double.parseDouble(params.get("overflow_rate"));
 		double overflowSize = blockSize * overflowRate;
 		String sindex = params.get("sindex");
-//		double budget = Double.parseDouble(params.get("budget")) * 1024 * 1024;
-//		int budgetBlocks = (int) Math.ceil(budget / blockSize);
-		
+		// double budget = Double.parseDouble(params.get("budget")) * 1024 * 1024;
+		// int budgetBlocks = (int) Math.ceil(budget / blockSize);
+
 		long incrementalRTreeBudget = 0;
-		for(Partition p: partitions) {
-			if(p.size > overflowSize) {
+		for (Partition p : partitions) {
+			if (p.size > overflowSize) {
 				incrementalRTreeBudget += p.size;
 			}
 		}
-		int budgetBlocks = (int) Math.ceil((float)incrementalRTreeBudget / (float)blockSize);
-		
+		int budgetBlocks = (int) Math.ceil((float) incrementalRTreeBudget / (float) blockSize);
+
 		Rectangle mbr = (Rectangle) OperationsParams.getShape(conf, "mbr");
 		if (mbr == null) {
 			mbr = new Rectangle(partitions.get(0));
@@ -68,7 +70,7 @@ public class PartitionSelector {
 			}
 		}
 		double querySize = 0.000001 * Math.sqrt(mbr.area());
-		
+
 		ArrayList<Partition> remainingPartitions = new ArrayList<Partition>();
 		ArrayList<Partition> splitPartitions = new ArrayList<Partition>();
 		remainingPartitions = (ArrayList<Partition>) partitions.clone();
@@ -80,11 +82,11 @@ public class PartitionSelector {
 			remainingPartitions.remove(bestCandidatePartition);
 			budgetBlocks -= bestCandidatePartition.getNumberOfBlock(blockSize);
 		}
-		
+
 		splitGroups = MetadataUtil.groupByOverlappingPartitions(splitPartitions);
 		return splitGroups;
 	}
-	
+
 	private static double computeReducedCost(ArrayList<Partition> splittingPartitions, double querySize,
 			int blockSize) {
 		// System.out.println("Computing reduced cost of a set of partitions.");
@@ -115,7 +117,7 @@ public class PartitionSelector {
 		// System.out.println("Reduced cost = " + Math.abs(costBefore - costAfter));
 		return Math.abs(costBefore - costAfter);
 	}
-	
+
 	private static Partition findBestCandidateToReduceCost(ArrayList<Partition> currentPartitions,
 			ArrayList<Partition> splittingPartitions, double querySize, int blockSize) {
 		Partition bestPartition = currentPartitions.get(0);
@@ -132,53 +134,54 @@ public class PartitionSelector {
 
 		return bestPartition;
 	}
-	
+
 	// Greedy algorithm that maximize the reduced area
-	private static ArrayList<ArrayList<Partition>> getSplitGroupsWithMaximumReducedArea(ArrayList<Partition> partitions, OperationsParams params) throws IOException {
+	private static ArrayList<ArrayList<Partition>> getSplitGroupsWithMaximumReducedArea(ArrayList<Partition> partitions,
+			OperationsParams params) throws IOException {
 		ArrayList<ArrayList<Partition>> splitGroups = new ArrayList<>();
-		
+
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(conf);
 		int blockSize = Integer.parseInt(conf.get("dfs.blocksize"));
 		double overflowRate = Double.parseDouble(params.get("overflow_rate"));
 		double overflowSize = blockSize * overflowRate;
 		String sindex = params.get("sindex");
-//		double budget = Double.parseDouble(params.get("budget")) * 1024 * 1024;
-//		int budgetBlocks = (int) Math.ceil(budget / blockSize);
-		
+		// double budget = Double.parseDouble(params.get("budget")) * 1024 * 1024;
+		// int budgetBlocks = (int) Math.ceil(budget / blockSize);
+
 		long incrementalRTreeBudget = 0;
-		for(Partition p: partitions) {
-			if(p.size > overflowSize) {
+		for (Partition p : partitions) {
+			if (p.size > overflowSize) {
 				incrementalRTreeBudget += p.size;
 			}
 		}
-		int budgetBlocks = (int) Math.ceil((float)incrementalRTreeBudget / (float)blockSize);
-		
+		int budgetBlocks = (int) Math.ceil((float) incrementalRTreeBudget / (float) blockSize);
+
 		ArrayList<Partition> remainingPartitions = new ArrayList<Partition>();
 		ArrayList<Partition> splitPartitions = new ArrayList<Partition>();
 		remainingPartitions = (ArrayList<Partition>) partitions.clone();
-		
+
 		while (budgetBlocks > 0) {
 			Partition bestCandidatePartition = findBestCandidateToReduceArea(remainingPartitions, splitPartitions);
 			splitPartitions.add(bestCandidatePartition);
 			remainingPartitions.remove(bestCandidatePartition);
 			budgetBlocks -= bestCandidatePartition.getNumberOfBlock(blockSize);
 		}
-		
+
 		splitGroups = MetadataUtil.groupByOverlappingPartitions(splitPartitions);
 		return splitGroups;
 	}
-	
+
 	private static double computeReducedArea(ArrayList<Partition> splittingPartitions, Partition partition) {
 		double reducedArea = partition.area();
-		for(Partition p: splittingPartitions) {
-			if(p.isIntersected(partition)) {
+		for (Partition p : splittingPartitions) {
+			if (p.isIntersected(partition)) {
 				reducedArea += p.getIntersection(partition).area();
 			}
 		}
 		return reducedArea;
- 	}
-	
+	}
+
 	private static Partition findBestCandidateToReduceArea(ArrayList<Partition> currentPartitions,
 			ArrayList<Partition> splittingPartitions) {
 		Partition bestPartition = currentPartitions.get(0);
@@ -192,45 +195,48 @@ public class PartitionSelector {
 			}
 			splittingPartitions.remove(p);
 		}
-		
+
 		return bestPartition;
 	}
-	
-	public static ArrayList<ArrayList<Partition>> getSplitGroups(Path path, OperationsParams params) throws IOException {
+
+	public static ArrayList<ArrayList<Partition>> getSplitGroups(Path path, OperationsParams params)
+			throws IOException {
 		String splitType = params.get("splittype");
-		if(splitType.equals("greedyreducedcost")) {
+		if (splitType.equals("greedyreducedcost")) {
 			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.MaximumReducedCost);
-		} else if(splitType.equals("greedyreducedarea")) {
+		} else if (splitType.equals("greedyreducedarea")) {
 			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.MaximumReducedArea);
-		} else if(splitType.equals("incrtree")) {
+		} else if (splitType.equals("incrtree")) {
 			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.IncrementalRTree);
-		} else if(splitType.equals("lsmrtree")) {
+		} else if (splitType.equals("lsmrtree")) {
 			// Check compaction policy
 		}
-		
+
 		return null;
 	}
-	
-	
-	public static ArrayList<ArrayList<Partition>> getSplitGroups(Path path, OperationsParams params, OptimizerType type) throws IOException {
-		
+
+	public static ArrayList<ArrayList<Partition>> getSplitGroups(Path path, OperationsParams params, OptimizerType type)
+			throws IOException {
+
 		ArrayList<Partition> partitions = MetadataUtil.getPartitions(path, params);
-		
-		if(type == OptimizerType.MaximumReducedCost) {
+
+		if (type == OptimizerType.MaximumReducedCost) {
 			return getSplitGroupsWithMaximumReducedCost(partitions, params);
-		} else if(type == OptimizerType.MaximumReducedArea) {
+		} else if (type == OptimizerType.MaximumReducedArea) {
 			return getSplitGroupsWithMaximumReducedArea(partitions, params);
-		} else if(type == OptimizerType.IncrementalRTree) {
+		} else if (type == OptimizerType.IncrementalRTree) {
+			System.out.println("Partition selection: Inc R-Tree");
 			ArrayList<ArrayList<Partition>> splitGroups = new ArrayList<ArrayList<Partition>>();
 			ArrayList<Partition> overflowPartitions = getOverflowPartitions(path, params);
-			for(Partition partition: overflowPartitions) {
+			System.out.println("Number of overflow partitions = " + overflowPartitions.size());
+			for (Partition partition : overflowPartitions) {
 				ArrayList<Partition> group = new ArrayList<Partition>();
 				group.add(partition);
 				splitGroups.add(group);
 			}
 			return splitGroups;
 		}
-		
+
 		return null;
 	}
 }
