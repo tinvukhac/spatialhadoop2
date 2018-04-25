@@ -5,6 +5,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
@@ -185,5 +186,55 @@ public class MetadataUtil {
 			partitions.addAll(group);
 		}
 		printPartitionSummary(partitions, blockSize);
+	}
+	
+	@SuppressWarnings("deprecation")
+	public static void dumpLSMComponentToFile(ArrayList<LSMComponent> components, Path dumpPath) throws IOException {
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+		
+		if(fs.exists(dumpPath)) {
+			fs.delete(dumpPath);
+		}
+		
+		OutputStream out = fs.create(dumpPath);
+		
+		for (LSMComponent component : components) {
+			Text text = new Text2();
+			component.toText(text);
+			out.write(text.getBytes(), 0, text.getLength());
+			out.write(NewLine);
+		}
+		
+		out.close();
+	}
+	
+	public static ArrayList<LSMComponent> getLSMComponents(Path lsmMasterPath) throws IOException {
+		ArrayList<LSMComponent> components = new ArrayList<LSMComponent>();
+		
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+
+		Text tempLine = new Text2();
+		@SuppressWarnings("resource")
+		LineReader in = new LineReader(fs.open(lsmMasterPath));
+		while (in.readLine(tempLine) > 0) {
+			LSMComponent tempComponent = new LSMComponent();
+			tempComponent.fromText(tempLine);
+			components.add(tempComponent);
+		}
+		
+		return components;
+	}
+	
+	public static LSMComponent createNewLSMComponent(ArrayList<LSMComponent> components) {
+		int maxId = Integer.MIN_VALUE;
+		for(LSMComponent component: components) {
+			if(maxId < component.id) {
+				maxId = component.id;
+			}
+		}
+		maxId += 1;
+		return new LSMComponent(maxId, "c" + maxId);
 	}
 }

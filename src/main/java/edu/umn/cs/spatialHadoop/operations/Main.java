@@ -16,7 +16,7 @@ import edu.umn.cs.spatialHadoop.ReadFile;
 import edu.umn.cs.spatialHadoop.indexing.DynamicIndexer;
 import edu.umn.cs.spatialHadoop.indexing.Indexer;
 import edu.umn.cs.spatialHadoop.indexing.LSMRTreeIndexer;
-import edu.umn.cs.spatialHadoop.indexing.RTreeInserter;
+import edu.umn.cs.spatialHadoop.indexing.IndexInserter;
 import edu.umn.cs.spatialHadoop.nasa.AggregateQuadTree;
 import edu.umn.cs.spatialHadoop.nasa.HDFPlot;
 import edu.umn.cs.spatialHadoop.nasa.HDFToText;
@@ -137,7 +137,7 @@ public class Main {
       
       pgd.addClass("mplot", MagickPlot.class, "Plot using ImageMagick");
       
-      pgd.addClass("insert", RTreeInserter.class, "Insert data from a file to another file with same type of shape");
+      pgd.addClass("insert", IndexInserter.class, "Insert data from a file to another file with same type of shape");
       
       pgd.addClass("lsmrtreeindex", LSMRTreeIndexer.class, "Index data using LSM with R-Tree component");
       
