@@ -152,9 +152,9 @@ public class IndexInserter {
 		for (Partition insertPartition : insertPartitions) {
 			for (Partition currentPartition : currentPartitions) {
 				if (insertPartition.cellId == currentPartition.cellId) {
-					currentPartition.expand(insertPartition);
+					insertPartition.expand(currentPartition);
 					if (!MetadataUtil.isContainedPartition(partitionsToAppend, currentPartition)) {
-						partitionsToAppend.add(currentPartition);
+						partitionsToAppend.add(insertPartition);
 					}
 				}
 			}
@@ -163,7 +163,7 @@ public class IndexInserter {
 		// Append files in temp directory to corresponding files in current path
 		for (Partition partition : partitionsToAppend) {
 			FSDataOutputStream out;
-			Path filePath = new Path(currentPath, partition.filename);
+			Path filePath = new Path(currentPath, partition.filename + "." + sindex);
 			if (!fs.exists(filePath)) {
 				out = fs.create(filePath);
 			} else {
