@@ -246,6 +246,7 @@ public class IndexInserter {
 
 		if (insertType.equals("rtreeappending")) {
 			params.setBoolean("isAppending", true);
+			params.set("currentPath", currentPath.toString());
 			appendRTree(currentPath, insertPath, params);
 		} else if (insertType.equals("lsmtreeflushing")) {
 			flushLSMTree(currentPath, insertPath, params);
