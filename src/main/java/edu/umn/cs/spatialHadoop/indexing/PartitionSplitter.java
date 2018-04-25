@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -28,6 +29,7 @@ import edu.umn.cs.spatialHadoop.OperationsParams;
 import edu.umn.cs.spatialHadoop.core.Rectangle;
 import edu.umn.cs.spatialHadoop.core.ResultCollector;
 import edu.umn.cs.spatialHadoop.core.Shape;
+import edu.umn.cs.spatialHadoop.core.SpatialSite;
 import edu.umn.cs.spatialHadoop.io.Text2;
 import edu.umn.cs.spatialHadoop.mapreduce.SpatialInputFormat3;
 
@@ -38,20 +40,20 @@ public class PartitionSplitter {
 	public static void reorganizeGroups(Path path, ArrayList<ArrayList<Partition>> splitGroups, OperationsParams params)
 			throws IOException, ClassNotFoundException, InterruptedException {
 		// Indexing each group separately
-		for(ArrayList<Partition> group: splitGroups) {
+		for (ArrayList<Partition> group : splitGroups) {
 			reorganizeSingleGroup(path, group, params);
 		}
 	}
 
 	public static void reorganizeSingleGroup(Path path, ArrayList<Partition> splitPatitions, OperationsParams params)
 			throws IOException, ClassNotFoundException, InterruptedException {
-		
+
 		@SuppressWarnings("deprecation")
 		Job job = new Job(params, "ReorganizeGroup");
 		Configuration conf = job.getConfiguration();
 		FileSystem fs = FileSystem.get(conf);
 		String sindex = params.get("sindex");
-		
+
 		// Find max id
 		ArrayList<Partition> currentPartitions = MetadataUtil.getPartitions(path, params);
 		int maxCellId = MetadataUtil.getMaximumCellId(currentPartitions);
@@ -82,11 +84,11 @@ public class PartitionSplitter {
 		params2.setBoolean("local", false);
 
 		Indexer.index(tempInputPath, tempOutputPath, params2);
-		
+
 		// Merge
 		currentPartitions = MetadataUtil.removePartitions(currentPartitions, splitPatitions);
 		ArrayList<Partition> tempPartitions = MetadataUtil.getPartitions(tempOutputPath, params2);
-		for(Partition tempPartition: tempPartitions) {
+		for (Partition tempPartition : tempPartitions) {
 			maxCellId++;
 			tempPartition.cellId = maxCellId;
 			String oldFileName = tempPartition.filename;
@@ -94,10 +96,10 @@ public class PartitionSplitter {
 			fs.rename(new Path(tempOutputPath, oldFileName), new Path(path, tempPartition.filename));
 			currentPartitions.add(tempPartition);
 		}
-		
+
 		fs.delete(tempInputPath);
 		fs.delete(tempOutputPath);
-		
+
 		// Update master and wkt file
 		Path currentMasterPath = new Path(path, "_master." + sindex);
 		fs.delete(currentMasterPath);
@@ -209,19 +211,19 @@ public class PartitionSplitter {
 			fs.delete(tempOutputPath);
 		}
 
-//		long totalSplitSize = 0;
-//		int totalSplitBlocks = 0;
+		// long totalSplitSize = 0;
+		// int totalSplitBlocks = 0;
 
 		for (Partition partition : splitPartitions) {
-//			totalSplitSize += partition.size;
-//			totalSplitBlocks += partition.getNumberOfBlock(blockSize);
+			// totalSplitSize += partition.size;
+			// totalSplitBlocks += partition.getNumberOfBlock(blockSize);
 			FileUtil.copy(fs, new Path(path, partition.filename), fs, new Path(tempInputPath, partition.filename),
 					false, true, conf);
 		}
 
-//		System.out.println("Total split partitions = " + splitPartitions.size());
-//		System.out.println("Total split size = " + totalSplitSize);
-//		System.out.println("Total split blocks = " + totalSplitBlocks);
+		// System.out.println("Total split partitions = " + splitPartitions.size());
+		// System.out.println("Total split size = " + totalSplitSize);
+		// System.out.println("Total split blocks = " + totalSplitBlocks);
 
 		MetadataUtil.dumpToFile(splitPartitions, path, "rects.split");
 		ArrayList<Partition> partitonsToRemove = new ArrayList<Partition>();
@@ -289,8 +291,88 @@ public class PartitionSplitter {
 			fs.delete(new Path(path, p.filename));
 		}
 	}
-	
-	public static void reorganize(Path path, ArrayList<ArrayList<Partition>> splitGroups, OperationsParams params) {
-		
+
+	public static void reorganize(Path indexPath, ArrayList<ArrayList<Partition>> splitGroups, OperationsParams params)
+			throws IOException, InterruptedException {
+
+		FileSystem fs = indexPath.getFileSystem(params);
+		// A list of temporary paths where the reorganized partitions will be stored.
+		Path[] tempPaths = new Path[splitGroups.size()];
+		Thread[] indexJobs = new Thread[splitGroups.size()];
+		for (int iGroup = 0; iGroup < splitGroups.size(); iGroup++) {
+			List<Partition> group = splitGroups.get(iGroup);
+			final OperationsParams indexParams = new OperationsParams(params);
+			indexParams.setBoolean("local", false);
+			final Path[] inPaths = new Path[group.size()];
+			for (int iPartition = 0; iPartition < group.size(); iPartition++) {
+				inPaths[iPartition] = new Path(indexPath, group.get(iPartition).filename);
+			}
+			do {
+				tempPaths[iGroup] = new Path(indexPath.getParent(), Integer.toString((int) (Math.random() * 1000000)));
+			} while (fs.exists(tempPaths[iGroup]));
+			final Path tempPath = tempPaths[iGroup];
+			indexJobs[iGroup] = new Thread() {
+				@Override
+				public void run() {
+					try {
+						Indexer.index(inPaths, tempPath, indexParams);
+					} catch (IOException e) {
+						e.printStackTrace();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} catch (ClassNotFoundException e) {
+						e.printStackTrace();
+					}
+				}
+			};
+			indexJobs[iGroup].setName("Index Group #" + iGroup);
+			indexJobs[iGroup].start();
+
+		}
+
+		// A list of all the new partitions (after reorganization)
+		ArrayList<Partition> mergedPartitions = MetadataUtil.getPartitions(indexPath, params);
+		int maxId = Integer.MIN_VALUE;
+		for (Partition p : mergedPartitions)
+			maxId = Math.max(maxId, p.cellId);
+		// Wait until all index jobs are done
+		for (int iGroup = 0; iGroup < indexJobs.length; iGroup++) {
+			indexJobs[iGroup].join();
+			// Remove all partitions that were indexed by the job
+			for (Partition oldP : splitGroups.get(iGroup)) {
+				if (!mergedPartitions.remove(oldP))
+					throw new RuntimeException(
+							"The partition " + oldP + " is being reorganized but does not exist in " + indexPath);
+			}
+
+			ArrayList<Partition> newPartitions = MetadataUtil.getPartitions(tempPaths[iGroup], params);
+			for (Partition newPartition : newPartitions) {
+				// Generate a new ID and filename to ensure it does not override an existing
+				// file
+				newPartition.cellId = ++maxId;
+				String newName = String.format("part-%05d", newPartition.cellId);
+				// Copy the extension of the existing file if it exists
+				int lastDot = newPartition.filename.lastIndexOf('.');
+				if (lastDot != -1)
+					newName += newPartition.filename.substring(lastDot);
+				fs.rename(new Path(tempPaths[iGroup], newPartition.filename), new Path(indexPath, newName));
+				newPartition.filename = newName;
+				mergedPartitions.add(newPartition);
+			}
+		}
+		// Write back the partitions to the master file
+		Path masterPath = new Path(indexPath, params.get("sindex"));
+		MetadataUtil.dumpToFile(mergedPartitions, masterPath);
+
+		// Delete old partitions that have been reorganized and replaced
+		for (List<Partition> group : splitGroups) {
+			for (Partition partition : group) {
+				fs.delete(new Path(indexPath, partition.filename), false);
+			}
+		}
+
+		// Delete all temporary paths that are supposed to be empty of data
+		for (Path tempPath : tempPaths)
+			fs.delete(tempPath, true);
 	}
 }

@@ -10,6 +10,8 @@ package edu.umn.cs.spatialHadoop.indexing;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -167,7 +169,7 @@ public class Indexer {
 		}
 	}
 
-	private static Job indexMapReduce(Path inPath, Path outPath, OperationsParams paramss)
+	private static Job indexMapReduce(Path[] inPaths, Path outPath, OperationsParams paramss)
 			throws IOException, InterruptedException, ClassNotFoundException {
 		Job job = new Job(paramss, "Indexer");
 		Configuration conf = job.getConfiguration();
@@ -177,7 +179,7 @@ public class Indexer {
 		Rectangle inputMBR = (Rectangle) OperationsParams.getShape(conf, "mbr");
 		if (inputMBR == null) {
 			System.out.println("MBR is not set");
-			inputMBR = FileMBR.fileMBR(inPath, new OperationsParams(conf));
+			inputMBR = FileMBR.fileMBR(inPaths, new OperationsParams(conf));
 			OperationsParams.setShape(conf, "mbr", inputMBR);
 		}
 
@@ -189,18 +191,16 @@ public class Indexer {
 		setLocalIndexer(conf, index);
 		Partitioner partitioner;
 		boolean isAppending = paramss.getBoolean("isAppending", false);
-		if(isAppending) {
+		if (isAppending) {
 			Path currentPath = new Path(paramss.get("currentPath"));
-//			partitioner = new RTreeFilePartitioner();
-//			((RTreeFilePartitioner) partitioner).createFromMasterFile(currentPath, paramss);
 			ArrayList<Partition> partitions = MetadataUtil.getPartitions(currentPath, paramss);
 			CellInfo[] cells = new CellInfo[partitions.size()];
-			for(int i = 0; i < cells.length; i++) {
+			for (int i = 0; i < cells.length; i++) {
 				cells[i] = new CellInfo(partitions.get(i));
 			}
 			partitioner = new CellPartitioner(cells);
 		} else {
-			partitioner = createPartitioner(inPath, outPath, conf, index);
+			partitioner = createPartitioner(inPaths, outPath, conf, index);
 		}
 		Partitioner.setPartitioner(conf, partitioner);
 
@@ -215,7 +215,7 @@ public class Indexer {
 		job.setReducerClass(PartitionerReduce.class);
 		// Set input and output
 		job.setInputFormatClass(SpatialInputFormat3.class);
-		SpatialInputFormat3.setInputPaths(job, inPath);
+		SpatialInputFormat3.setInputPaths(job, inPaths);
 		job.setOutputFormatClass(IndexOutputFormat.class);
 		IndexOutputFormat.setOutputPath(job, outPath);
 		// Set number of reduce tasks according to cluster status
@@ -249,7 +249,7 @@ public class Indexer {
 	}
 
 	public static Partitioner createPartitioner(Path in, Path out, Configuration job, String partitionerName)
-			throws IOException {
+			throws IOException, ClassNotFoundException, InterruptedException {
 		return createPartitioner(new Path[] { in }, out, job, partitionerName);
 	}
 
@@ -262,9 +262,11 @@ public class Indexer {
 	 * @param partitionerName
 	 * @return
 	 * @throws IOException
+	 * @throws InterruptedException 
+	 * @throws ClassNotFoundException 
 	 */
 	public static Partitioner createPartitioner(Path[] ins, Path out, Configuration job, String partitionerName)
-			throws IOException {
+			throws IOException, ClassNotFoundException, InterruptedException {
 		try {
 			Partitioner partitioner;
 			Class<? extends Partitioner> partitionerClass = PartitionerClasses.get(partitionerName.toLowerCase());
@@ -294,38 +296,46 @@ public class Indexer {
 			FileSystem outFS = out.getFileSystem(job);
 			long outBlockSize = outFS.getDefaultBlockSize(out);
 
-			final List<Point> sample = new ArrayList<Point>();
-			float sample_ratio = job.getFloat(SpatialSite.SAMPLE_RATIO, 0.01f);
-			long sample_size = job.getLong(SpatialSite.SAMPLE_SIZE, 100 * 1024 * 1024);
-
-			LOG.info("Reading a sample of " + (int) Math.round(sample_ratio * 100) + "%");
-			ResultCollector<Point> resultCollector = new ResultCollector<Point>() {
-				@Override
-				public void collect(Point p) {
-					sample.add(p.clone());
-				}
-			};
-
-			OperationsParams params2 = new OperationsParams(job);
-			params2.setFloat("ratio", sample_ratio);
-			params2.setLong("size", sample_size);
-			if (job.get("shape") != null)
-				params2.set("shape", job.get("shape"));
-			if (job.get("local") != null)
-				params2.set("local", job.get("local"));
-			params2.setClass("outshape", Point.class, Shape.class);
-			Sampler.sample(ins, resultCollector, params2);
+//			final List<Point> sample = new ArrayList<Point>();
+//			float sample_ratio = job.getFloat(SpatialSite.SAMPLE_RATIO, 0.01f);
+//			long sample_size = job.getLong(SpatialSite.SAMPLE_SIZE, 100 * 1024 * 1024);
+//
+//			LOG.info("Reading a sample of " + (int) Math.round(sample_ratio * 100) + "%");
+//			ResultCollector<Point> resultCollector = new ResultCollector<Point>() {
+//				@Override
+//				public void collect(Point p) {
+//					sample.add(p.clone());
+//				}
+//			};
+//
+//			OperationsParams params2 = new OperationsParams(job);
+//			params2.setFloat("ratio", sample_ratio);
+//			params2.setLong("size", sample_size);
+//			if (job.get("shape") != null)
+//				params2.set("shape", job.get("shape"));
+//			if (job.get("local") != null)
+//				params2.set("local", job.get("local"));
+//			params2.setClass("outshape", Point.class, Shape.class);
+//			Sampler.sample(ins, resultCollector, params2);
+			OperationsParams sampleParams = new OperationsParams(job);
+			sampleParams.setClass("outshape", Point.class, Shape.class);
+			final String[] sample = Sampler.takeSample(ins, sampleParams);
+			Point[] samplePoints = new Point[sample.length];
+			for (int i = 0; i < sample.length; i++) {
+				samplePoints[i] = new Point();
+				samplePoints[i].fromText(new Text(sample[i]));
+			}
 			long t2 = System.currentTimeMillis();
 			System.out.println("Total time for sampling in millis: " + (t2 - t1));
-			LOG.info("Finished reading a sample of " + sample.size() + " records");
+			LOG.info("Finished reading a sample of " + samplePoints.length + " records");
 
 			int partitionCapacity = (int) Math.max(1,
-					Math.floor((double) sample.size() * outBlockSize / estimatedOutSize));
+					Math.floor((double) samplePoints.length * outBlockSize / estimatedOutSize));
 			int numPartitions = Math.max(1, (int) Math.ceil((float) estimatedOutSize / outBlockSize));
 			LOG.info("Partitioning the space into " + numPartitions + " partitions with capacity of "
 					+ partitionCapacity);
 
-			partitioner.createFromPoints(inMBR, sample.toArray(new Point[sample.size()]), partitionCapacity);
+			partitioner.createFromPoints(inMBR, samplePoints, partitionCapacity);
 
 			return partitioner;
 		} catch (InstantiationException e) {
@@ -337,52 +347,52 @@ public class Indexer {
 		}
 	}
 
-	private static void indexLocal(Path inPath, final Path outPath, OperationsParams params)
+	private static void indexLocal(Path[] inPaths, final Path outPath, Partitioner p, OperationsParams params)
 			throws IOException, InterruptedException {
 		Job job = Job.getInstance(params);
 		final Configuration conf = job.getConfiguration();
 
-		final String sindex = conf.get("sindex");
+		final boolean disjoint = params.getBoolean(Partitioner.PartitionerDisjoint, false);
+		String globalIndexExtension = p.getClass().getAnnotation(Partitioner.GlobalIndexerMetadata.class).extension();
 
 		// Start reading input file
 		List<InputSplit> splits = new ArrayList<InputSplit>();
 		final SpatialInputFormat3<Rectangle, Shape> inputFormat = new SpatialInputFormat3<Rectangle, Shape>();
-		FileSystem inFs = inPath.getFileSystem(conf);
-		FileStatus inFStatus = inFs.getFileStatus(inPath);
-		if (inFStatus != null && !inFStatus.isDir()) {
-			// One file, retrieve it immediately.
-			// This is useful if the input is a hidden file which is automatically
-			// skipped by FileInputFormat. We need to plot a hidden file for the case
-			// of plotting partition boundaries of a spatial index
-			splits.add(new FileSplit(inPath, 0, inFStatus.getLen(), new String[0]));
-		} else {
-			SpatialInputFormat3.setInputPaths(job, inPath);
-			for (InputSplit s : inputFormat.getSplits(job))
-				splits.add(s);
+		for (Path inPath : inPaths) {
+			FileSystem inFs = inPath.getFileSystem(conf);
+			FileStatus inFStatus = inFs.getFileStatus(inPath);
+			if (inFStatus != null && !inFStatus.isDir()) {
+				// One file, retrieve it immediately.
+				// This is useful if the input is a hidden file which is automatically
+				// skipped by FileInputFormat. We need to plot a hidden file for the case
+				// of plotting partition boundaries of a spatial index
+				splits.add(new FileSplit(inPath, 0, inFStatus.getLen(), new String[0]));
+			} else {
+				SpatialInputFormat3.addInputPath(job, inPath);
+				for (InputSplit s : inputFormat.getSplits(job))
+					splits.add(s);
+			}
 		}
 
 		// Copy splits to a final array to be used in parallel
 		final FileSplit[] fsplits = splits.toArray(new FileSplit[splits.size()]);
-		boolean replicate = PartitionerReplicate.get(sindex);
 
 		// Set input file MBR if not already set
 		Rectangle inputMBR = (Rectangle) OperationsParams.getShape(conf, "mbr");
 		if (inputMBR == null) {
-			inputMBR = FileMBR.fileMBR(inPath, new OperationsParams(conf));
+			inputMBR = new Rectangle(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY,
+					Double.NEGATIVE_INFINITY);
+			for (Path inPath : inPaths) {
+				inputMBR.expand(FileMBR.fileMBR(inPath, new OperationsParams(conf)));
+			}
 			OperationsParams.setShape(conf, "mbr", inputMBR);
 		}
 
-		setLocalIndexer(conf, sindex);
-		final Partitioner partitioner = createPartitioner(inPath, outPath, conf, sindex);
-
-		final IndexRecordWriter<Shape> recordWriter = new IndexRecordWriter<Shape>(partitioner, replicate, sindex,
-				outPath, conf);
+		final IndexRecordWriter<Shape> recordWriter = new IndexRecordWriter<Shape>(p, null, outPath, conf);
 		for (FileSplit fsplit : fsplits) {
 			RecordReader<Rectangle, Iterable<Shape>> reader = inputFormat.createRecordReader(fsplit, null);
 			if (reader instanceof SpatialRecordReader3) {
 				((SpatialRecordReader3) reader).initialize(fsplit, conf);
-			} else if (reader instanceof RTreeRecordReader3) {
-				((RTreeRecordReader3) reader).initialize(fsplit, conf);
 			} else if (reader instanceof HDFRecordReader) {
 				((HDFRecordReader) reader).initialize(fsplit, conf);
 			} else {
@@ -393,9 +403,14 @@ public class Indexer {
 
 			while (reader.nextKeyValue()) {
 				Iterable<Shape> shapes = reader.getCurrentValue();
-				if (replicate) {
+				if (disjoint) {
 					for (final Shape s : shapes) {
-						partitioner.overlapPartitions(s, new ResultCollector<Integer>() {
+						if (s == null)
+							continue;
+						Rectangle mbr = s.getMBR();
+						if (mbr == null)
+							continue;
+						p.overlapPartitions(mbr, new ResultCollector<Integer>() {
 							@Override
 							public void collect(Integer id) {
 								partitionID.set(id);
@@ -409,7 +424,12 @@ public class Indexer {
 					}
 				} else {
 					for (final Shape s : shapes) {
-						int pid = partitioner.overlapPartition(s);
+						if (s == null)
+							continue;
+						Rectangle mbr = s.getMBR();
+						if (mbr == null)
+							continue;
+						int pid = p.overlapPartition(mbr);
 						if (pid != -1) {
 							partitionID.set(pid);
 							recordWriter.write(partitionID, s);
@@ -421,35 +441,198 @@ public class Indexer {
 		}
 		recordWriter.close(null);
 
-		// Write the WKT formatted master file
-		Path masterPath = new Path(outPath, "_master." + sindex);
+		// Write the WKT-formatted master file
 		FileSystem outFs = outPath.getFileSystem(params);
-		Path wktPath = new Path(outPath, "_" + sindex + ".wkt");
-		PrintStream wktOut = new PrintStream(outFs.create(wktPath));
-		wktOut.println("ID\tBoundaries\tRecord Count\tSize\tFile name");
-		Text tempLine = new Text2();
-		Partition tempPartition = new Partition();
-		LineReader in = new LineReader(outFs.open(masterPath));
-		while (in.readLine(tempLine) > 0) {
-			tempPartition.fromText(tempLine);
-			wktOut.println(tempPartition.toWKT());
-		}
-		in.close();
-		wktOut.close();
+		Path masterPath = new Path(outPath, "_master." + globalIndexExtension);
+		Partitioner.generateMasterWKT(outFs, masterPath);
 	}
 
 	public static Job index(Path inPath, Path outPath, OperationsParams params)
 			throws IOException, InterruptedException, ClassNotFoundException {
-		if (OperationsParams.isLocal(new JobConf(params), inPath)) {
-			indexLocal(inPath, outPath, params);
+		return index(new Path[] { inPath }, outPath, params);
+	}
+
+	public static Job index(Path[] inPaths, Path outPath, OperationsParams params)
+			throws IOException, InterruptedException, ClassNotFoundException {
+		// Partitioner p = initializeIndexers(inPaths, outPath, params);
+		// if (OperationsParams.isLocal(new JobConf(params), inPaths)) {
+		// indexLocal(inPaths, outPath, p, params);
+		// return null;
+		// } else {
+		// Job job = indexMapReduce(inPaths, outPath, p, params);
+		// return job;
+		// }
+		Partitioner p = initializeIndexers(inPaths, outPath, params);
+		if (OperationsParams.isLocal(new JobConf(params), inPaths)) {
+			indexLocal(inPaths, outPath, p, params);
 			return null;
 		} else {
-			Job job = indexMapReduce(inPath, outPath, params);
+			Job job = indexMapReduce(inPaths, outPath, params);
 			if (!job.isSuccessful())
 				throw new RuntimeException("Failed job " + job);
 			return job;
 		}
 	}
+
+	/**
+	 * Initialize the global and local indexers according to the input file, the
+	 * output file, and the user-specified parameters
+	 * 
+	 * @param inPaths
+	 * @param outPath
+	 * @param conf
+	 * @return the created {@link Partitioner}
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	private static Partitioner initializeIndexers(Path[] inPaths, Path outPath, Configuration conf)
+			throws IOException, InterruptedException {
+		// Set the correct partitioner according to index type
+		String sindex = conf.get("sindex");
+		SpatialSite.SpatialIndex spatialIndex;
+		if (sindex != null && SpatialSite.CommonSpatialIndex.containsKey(sindex))
+			spatialIndex = SpatialSite.CommonSpatialIndex.get(sindex);
+		else
+			spatialIndex = new SpatialSite.SpatialIndex();
+		if (conf.get("gindex") != null)
+			spatialIndex.gindex = SpatialSite.getGlobalIndex(conf.get("gindex"));
+		if (conf.get("lindex") != null)
+			spatialIndex.lindex = SpatialSite.getLocalIndex(conf.get("lindex"));
+		spatialIndex.disjoint = conf.getBoolean("disjoint", spatialIndex.disjoint);
+
+		if (spatialIndex.lindex != null)
+			conf.setClass(LocalIndex.LocalIndexClass, spatialIndex.lindex, LocalIndex.class);
+
+		long t1 = System.currentTimeMillis();
+		Partitioner partitioner = initializeGlobalIndex(inPaths, outPath, conf, spatialIndex.gindex);
+		Partitioner.setPartitioner(conf, partitioner);
+
+		long t2 = System.currentTimeMillis();
+		System.out.println("Total time for space subdivision in millis: " + (t2 - t1));
+		return partitioner;
+	}
+
+	public static Partitioner initializeGlobalIndex(Path in, Path out, Configuration job,
+			Class<? extends Partitioner> gindex) throws IOException {
+		return initializeGlobalIndex(new Path[] { in }, out, job, gindex);
+	}
+
+	/**
+	 * Create a partitioner for a particular job
+	 * 
+	 * @param ins
+	 * @param out
+	 * @param job
+	 * @param partitionerClass
+	 * @return
+	 * @throws IOException
+	 */
+	public static Partitioner initializeGlobalIndex(Path[] ins, Path out, Configuration job,
+			Class<? extends Partitioner> partitionerClass) throws IOException {
+
+		// Determine number of partitions
+		long inSize = 0;
+		for (Path in : ins)
+			inSize += FileUtil.getPathSize(in.getFileSystem(job), in);
+
+		long estimatedOutSize = (long) (inSize * (1.0 + job.getFloat(SpatialSite.INDEXING_OVERHEAD, 0.1f)));
+		FileSystem outFS = out.getFileSystem(job);
+		long outBlockSize = outFS.getDefaultBlockSize(out);
+
+		try {
+			Partitioner partitioner;
+
+			Partitioner.GlobalIndexerMetadata partitionerMetadata = partitionerClass
+					.getAnnotation(Partitioner.GlobalIndexerMetadata.class);
+			boolean disjointSupported = partitionerMetadata != null && partitionerMetadata.disjoint();
+
+			if (job.getBoolean("disjoint", false) && !disjointSupported)
+				throw new RuntimeException(
+						"Partitioner " + partitionerClass.getName() + " does not support disjoint partitioning");
+
+			try {
+				Constructor<? extends Partitioner> c = partitionerClass.getConstructor(Rectangle.class, int.class);
+				// Constructor needs an MBR and number of partitions
+				final Rectangle inMBR = SpatialSite.getMBR(job, ins);
+				int numOfPartitions = (int) Math.ceil((double) estimatedOutSize / outBlockSize);
+				return (Partitioner) c.newInstance(inMBR, numOfPartitions);
+			} catch (NoSuchMethodException e) {
+				try {
+					Constructor<? extends Partitioner> c = partitionerClass.getConstructor(Point[].class, int.class);
+					// Constructor needs a sample and capacity (no MBR)
+					OperationsParams sampleParams = new OperationsParams(job);
+					sampleParams.setClass("outshape", Point.class, Shape.class);
+					sampleParams.set("ratio", sampleParams.get(SpatialSite.SAMPLE_RATIO));
+					final String[] sample = Sampler.takeSample(ins, sampleParams);
+					Point[] samplePoints = new Point[sample.length];
+					for (int i = 0; i < sample.length; i++) {
+						samplePoints[i] = new Point();
+						samplePoints[i].fromText(new Text(sample[i]));
+					}
+					int partitionCapacity = (int) Math.max(1,
+							Math.floor((double) sample.length * outBlockSize / estimatedOutSize));
+					return (Partitioner) c.newInstance(samplePoints, partitionCapacity);
+				} catch (NoSuchMethodException e1) {
+					try {
+						Constructor<? extends Partitioner> c = partitionerClass.getConstructor(Rectangle.class,
+								Point[].class, int.class);
+						final Rectangle inMBR = SpatialSite.getMBR(job, ins);
+						OperationsParams sampleParams = new OperationsParams(job);
+						sampleParams.setClass("outshape", Point.class, Shape.class);
+						final String[] sample = Sampler.takeSample(ins, sampleParams);
+						Point[] samplePoints = new Point[sample.length];
+						for (int i = 0; i < sample.length; i++) {
+							samplePoints[i] = new Point();
+							samplePoints[i].fromText(new Text(sample[i]));
+						}
+						int partitionCapacity = (int) Math.max(1,
+								Math.floor((double) sample.length * outBlockSize / estimatedOutSize));
+						return (Partitioner) c.newInstance(inMBR, samplePoints, partitionCapacity);
+					} catch (NoSuchMethodException e2) {
+						throw new RuntimeException("Could not find a suitable constructor for the partitioner "
+								+ partitionerClass.getName());
+					} catch (InterruptedException e2) {
+						e2.printStackTrace();
+						return null;
+					} catch (ClassNotFoundException e2) {
+						e2.printStackTrace();
+						return null;
+					}
+				} catch (InterruptedException e1) {
+					e1.printStackTrace();
+					return null;
+				} catch (ClassNotFoundException e1) {
+					e1.printStackTrace();
+					return null;
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				return null;
+			}
+		} catch (InstantiationException e) {
+			e.printStackTrace();
+			return null;
+		} catch (IllegalAccessException e) {
+			e.printStackTrace();
+			return null;
+		} catch (InvocationTargetException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+
+	// public static Job index(Path inPath, Path outPath, OperationsParams params)
+	// throws IOException, InterruptedException, ClassNotFoundException {
+	// if (OperationsParams.isLocal(new JobConf(params), inPath)) {
+	// indexLocal(inPath, outPath, params);
+	// return null;
+	// } else {
+	// Job job = indexMapReduce(inPath, outPath, params);
+	// if (!job.isSuccessful())
+	// throw new RuntimeException("Failed job " + job);
+	// return job;
+	// }
+	// }
 
 	protected static void printUsage() {
 		System.out.println("Builds a spatial index on an input file");

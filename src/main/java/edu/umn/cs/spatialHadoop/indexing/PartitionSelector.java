@@ -14,7 +14,8 @@ public class PartitionSelector {
 	public enum OptimizerType {
 		MaximumReducedCost,
 		MaximumReducedArea,
-		IncrementalRTree
+		IncrementalRTree,
+		LSMRTree
 	}
 	
 	// Incremental RTree optimizer
@@ -203,7 +204,10 @@ public class PartitionSelector {
 			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.MaximumReducedArea);
 		} else if(splitType.equals("incrtree")) {
 			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.IncrementalRTree);
+		} else if(splitType.equals("lsmrtree")) {
+			// Check compaction policy
 		}
+		
 		return null;
 	}
 	

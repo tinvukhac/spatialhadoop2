@@ -474,10 +474,11 @@ public class Repartition {
     params2.setFloat("ratio", sample_ratio);
     params2.setLong("size", sample_size);
     params2.setClass("outshape", Point.class, TextSerializable.class);
-    Sampler.sample(files, resultCollector, params2);
+//    Sampler.sample(files, resultCollector, params2);
     LOG.info("Finished reading a sample of size: "+sample.size()+" records");
     
-    long inFileSize = Sampler.sizeOfLastProcessedFile;
+//    long inFileSize = Sampler.sizeOfLastProcessedFile;
+    long inFileSize = 0;
 
     // Compute an approximate MBR to determine the desired number of rows
     // and columns

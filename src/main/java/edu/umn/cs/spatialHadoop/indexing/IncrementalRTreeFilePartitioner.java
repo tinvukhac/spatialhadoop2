@@ -179,6 +179,12 @@ public class IncrementalRTreeFilePartitioner extends Partitioner {
 						} catch (IOException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
+						} catch (ClassNotFoundException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
 						}
 					}
 				};
@@ -213,7 +219,7 @@ public class IncrementalRTreeFilePartitioner extends Partitioner {
 	}
 
 	private static ArrayList<Partition> getCellsFromSample(Path in, Path out, Configuration job,
-			OperationsParams params, Partition partition, int maxCellId) throws IOException {
+			OperationsParams params, Partition partition, int maxCellId) throws IOException, ClassNotFoundException, InterruptedException {
 
 		Path[] ins = new Path[1];
 		ins[0] = in;
@@ -228,36 +234,45 @@ public class IncrementalRTreeFilePartitioner extends Partitioner {
 		FileSystem outFS = out.getFileSystem(job);
 		long outBlockSize = outFS.getDefaultBlockSize(out);
 
-		final List<Point> sample = new ArrayList<Point>();
-		float sample_ratio = job.getFloat(SpatialSite.SAMPLE_RATIO, 0.01f);
-		long sample_size = job.getLong(SpatialSite.SAMPLE_SIZE, 100 * 1024 * 1024);
-
-		ResultCollector<Point> resultCollector = new ResultCollector<Point>() {
-			@Override
-			public void collect(Point p) {
-				sample.add(p.clone());
-			}
-		};
-
-		OperationsParams params2 = new OperationsParams(job);
-		params2.setFloat("ratio", sample_ratio);
-		params2.setLong("size", sample_size);
-		if (job.get("shape") != null)
-			params2.set("shape", job.get("shape"));
-		if (job.get("local") != null)
-			params2.set("local", job.get("local"));
-		params2.setBoolean("local", true);
-		params2.setBoolean("background", true);
-		params2.setClass("outshape", Point.class, Shape.class);
-		Sampler.sample(ins, resultCollector, params2);
+//		final List<Point> sample = new ArrayList<Point>();
+//		float sample_ratio = job.getFloat(SpatialSite.SAMPLE_RATIO, 0.01f);
+//		long sample_size = job.getLong(SpatialSite.SAMPLE_SIZE, 100 * 1024 * 1024);
+//
+//		ResultCollector<Point> resultCollector = new ResultCollector<Point>() {
+//			@Override
+//			public void collect(Point p) {
+//				sample.add(p.clone());
+//			}
+//		};
+//
+//		OperationsParams params2 = new OperationsParams(job);
+//		params2.setFloat("ratio", sample_ratio);
+//		params2.setLong("size", sample_size);
+//		if (job.get("shape") != null)
+//			params2.set("shape", job.get("shape"));
+//		if (job.get("local") != null)
+//			params2.set("local", job.get("local"));
+//		params2.setBoolean("local", true);
+//		params2.setBoolean("background", true);
+//		params2.setClass("outshape", Point.class, Shape.class);
+//		Sampler.sample(ins, resultCollector, params2);
 		// long t2 = System.currentTimeMillis();
 		// System.out.println("Total time for sampling in millis: " + (t2 -
 		// t1));
+		
+		OperationsParams sampleParams = new OperationsParams(job);
+		sampleParams.setClass("outshape", Point.class, Shape.class);
+		final String[] sample = Sampler.takeSample(ins, sampleParams);
+		Point[] samplePoints = new Point[sample.length];
+		for (int i = 0; i < sample.length; i++) {
+			samplePoints[i] = new Point();
+			samplePoints[i].fromText(new Text(sample[i]));
+		}
 
-		int partitionCapacity = (int) Math.max(1, Math.floor((double) sample.size() * outBlockSize / estimatedOutSize));
+		int partitionCapacity = (int) Math.max(1, Math.floor((double) samplePoints.length * outBlockSize / estimatedOutSize));
 		int numPartitions = Math.max(1, (int) Math.ceil((float) estimatedOutSize / outBlockSize));
 
-		ArrayList<Partition> cellsFromPoints = getCellsFromPoints(inMBR, sample.toArray(new Point[sample.size()]),
+		ArrayList<Partition> cellsFromPoints = getCellsFromPoints(inMBR, samplePoints,
 				partitionCapacity, partition, maxCellId);
 
 		return cellsFromPoints;
