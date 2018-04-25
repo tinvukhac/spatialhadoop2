@@ -294,7 +294,7 @@ public class PartitionSplitter {
 
 	public static void reorganize(Path indexPath, ArrayList<ArrayList<Partition>> splitGroups, OperationsParams params)
 			throws IOException, InterruptedException {
-
+		System.out.println("Reorgnizing...");
 		FileSystem fs = indexPath.getFileSystem(params);
 		// A list of temporary paths where the reorganized partitions will be stored.
 		Path[] tempPaths = new Path[splitGroups.size()];

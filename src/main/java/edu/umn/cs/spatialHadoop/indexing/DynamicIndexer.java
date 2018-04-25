@@ -19,8 +19,8 @@ public class DynamicIndexer {
 		Path currentPath = new Path(currentPathString);
 		Path appendPath = new Path(appendPathString);
 
-		System.out.println("Current index path: " + currentPath);
-		System.out.println("Append data path: " + appendPath);
+		System.out.println("Current path: " + currentPath);
+		System.out.println("Append path: " + appendPath);
 		
 		// Data flushing
 		long t1 = System.currentTimeMillis();
