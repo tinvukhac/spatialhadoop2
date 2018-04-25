@@ -213,23 +213,24 @@ public class PartitionSelector {
 	
 	
 	public static ArrayList<ArrayList<Partition>> getSplitGroups(Path path, OperationsParams params, OptimizerType type) throws IOException {
-		ArrayList<ArrayList<Partition>> splitGroups = new ArrayList<>();
 		
 		ArrayList<Partition> partitions = MetadataUtil.getPartitions(path, params);
 		
 		if(type == OptimizerType.MaximumReducedCost) {
-			splitGroups = getSplitGroupsWithMaximumReducedCost(partitions, params);
+			return getSplitGroupsWithMaximumReducedCost(partitions, params);
 		} else if(type == OptimizerType.MaximumReducedArea) {
-			splitGroups = getSplitGroupsWithMaximumReducedArea(partitions, params);
+			return getSplitGroupsWithMaximumReducedArea(partitions, params);
 		} else if(type == OptimizerType.IncrementalRTree) {
+			ArrayList<ArrayList<Partition>> splitGroups = new ArrayList<ArrayList<Partition>>();
 			ArrayList<Partition> overflowPartitions = getOverflowPartitions(path, params);
 			for(Partition partition: overflowPartitions) {
 				ArrayList<Partition> group = new ArrayList<Partition>();
 				group.add(partition);
 				splitGroups.add(group);
 			}
+			return splitGroups;
 		}
 		
-		return splitGroups;
+		return null;
 	}
 }
