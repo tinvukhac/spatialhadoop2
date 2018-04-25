@@ -140,6 +140,7 @@ public class IndexInserter {
 			tempPath = new Path(currentPath.getParent(), Integer.toString((int) (Math.random() * 1000000)));
 		} while (fs.exists(tempPath));
 
+		params.set("currentPath", currentPath.toString());
 		Indexer.index(insertPath, tempPath, params);
 
 		// Read master file to get all file names
@@ -152,7 +153,7 @@ public class IndexInserter {
 				if (insertPartition.cellId == currentPartition.cellId) {
 					currentPartition.expand(insertPartition);
 					if (!MetadataUtil.isContainedPartition(partitionsToAppend, currentPartition)) {
-						partitionsToAppend.add(currentPartition);
+						partitionsToAppend.add(insertPartition);
 					}
 				}
 			}
