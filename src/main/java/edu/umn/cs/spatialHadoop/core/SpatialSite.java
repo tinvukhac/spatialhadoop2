@@ -54,6 +54,7 @@ import edu.umn.cs.spatialHadoop.mapred.ShapeIterRecordReader;
 import edu.umn.cs.spatialHadoop.mapred.SpatialRecordReader.ShapeIterator;
 import edu.umn.cs.spatialHadoop.operations.FileMBR;
 import edu.umn.cs.spatialHadoop.util.FileUtil;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * Combines all the configuration needed for SpatialHadoop.
@@ -153,6 +154,52 @@ public class SpatialSite {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		// Load YAML file
+	    Yaml yaml = new Yaml();
+	    Map<String, Object> conf = yaml.load(SpatialSite.class.getResourceAsStream("/spatial-default.yaml"));
+	    // Load common shapes
+	    Map<String, String> shapes = (Map<String, String>) conf.get("Shapes");
+	    for (Map.Entry<String, String> shape : shapes.entrySet()) {
+	      try {
+	        String shortName = shape.getKey();
+	        Class<? extends Shape> shapeClass = Class.forName(shape.getValue()).asSubclass(Shape.class);
+	        CommonShapes.put(shortName, shapeClass);
+	      } catch (ClassNotFoundException e) {
+	        e.printStackTrace();
+	      }
+	    }
+	    // Load global index
+	    for (String gindex : (List<String>) conf.get("GlobalIndexes")) {
+	      try {
+	        Class<? extends Partitioner> indexerClass = Class.forName(gindex).asSubclass(Partitioner.class);
+	        Partitioner.GlobalIndexerMetadata metadata = indexerClass.getAnnotation(Partitioner.GlobalIndexerMetadata.class);
+	        CommonGlobalIndexes.put(metadata.extension(), indexerClass);
+	      } catch (ClassNotFoundException e) {
+	        e.printStackTrace();
+	      }
+	    }
+	    // Load local index
+	    for (String lindex : (List<String>) conf.get("LocalIndexes")) {
+	      try {
+	        Class<? extends LocalIndex> indexerClass = Class.forName(lindex).asSubclass(LocalIndex.class);
+	        LocalIndex.LocalIndexMetadata metadata = indexerClass.getAnnotation(LocalIndex.LocalIndexMetadata.class);
+	        CommonLocalIndexes.put(metadata.extension(), indexerClass);
+	      } catch (ClassNotFoundException e) {
+	        e.printStackTrace();
+	      }
+	    }
+	    // Load spatial indexes
+	    List<Map<String, Object>> sindexes = (List<Map<String, Object>>) conf.get("SpatialIndexes");
+	    for (Map<String, Object> sindex : sindexes) {
+	      SpatialIndex index = new SpatialIndex();
+	      if (sindex.containsKey("gindex"))
+	        index.gindex = getGlobalIndex((String) sindex.get("gindex"));
+	      if (sindex.containsKey("lindex"))
+	        index.lindex = getLocalIndex((String) sindex.get("lindex"));
+	      if (sindex.containsKey("disjoint"))
+	        index.disjoint = (Boolean) sindex.get("disjoint");
+	      CommonSpatialIndex.put((String) sindex.get("short-name"), index);
+	    }
 	}
 
 	public static Class<? extends Partitioner> getGlobalIndex(String name) {

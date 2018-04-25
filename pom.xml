@@ -232,6 +232,13 @@
 			<version>20180130</version>
 		</dependency>
 
+		<!-- https://mvnrepository.com/artifact/org.yaml/snakeyaml -->
+		<dependency>
+			<groupId>org.yaml</groupId>
+			<artifactId>snakeyaml</artifactId>
+			<version>1.20</version>
+		</dependency>
+
 	</dependencies>
 
 	<distributionManagement>
