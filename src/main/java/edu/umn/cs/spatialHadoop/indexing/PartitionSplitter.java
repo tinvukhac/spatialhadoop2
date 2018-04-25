@@ -31,7 +31,7 @@ import edu.umn.cs.spatialHadoop.core.Shape;
 import edu.umn.cs.spatialHadoop.io.Text2;
 import edu.umn.cs.spatialHadoop.mapreduce.SpatialInputFormat3;
 
-public class RTreeReorganizer {
+public class PartitionSplitter {
 
 	private static final Log LOG = LogFactory.getLog(Indexer.class);
 
@@ -191,7 +191,7 @@ public class RTreeReorganizer {
 
 		@SuppressWarnings("deprecation")
 		Job job = new Job(params, "RTreeReorganizer");
-		job.setJarByClass(RTreeReorganizer.class);
+		job.setJarByClass(PartitionSplitter.class);
 		Configuration conf = job.getConfiguration();
 		FileSystem fs = FileSystem.get(conf);
 		double blockSize = Double.parseDouble(conf.get("dfs.blocksize"));
@@ -288,5 +288,9 @@ public class RTreeReorganizer {
 		for (Partition p : splitPartitions) {
 			fs.delete(new Path(path, p.filename));
 		}
+	}
+	
+	public static void reorganize(Path path, ArrayList<ArrayList<Partition>> splitGroups, OperationsParams params) {
+		
 	}
 }

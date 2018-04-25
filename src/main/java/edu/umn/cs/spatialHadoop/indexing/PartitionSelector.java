@@ -9,11 +9,12 @@ import org.apache.hadoop.fs.Path;
 import edu.umn.cs.spatialHadoop.OperationsParams;
 import edu.umn.cs.spatialHadoop.core.Rectangle;
 
-public class RTreeOptimizer {
+public class PartitionSelector {
 	
 	public enum OptimizerType {
 		MaximumReducedCost,
-		MaximumReducedArea
+		MaximumReducedArea,
+		IncrementalRTree
 	}
 	
 	// Incremental RTree optimizer
@@ -194,6 +195,19 @@ public class RTreeOptimizer {
 		return bestPartition;
 	}
 	
+	public static ArrayList<ArrayList<Partition>> getSplitGroups(Path path, OperationsParams params) throws IOException {
+		String splitType = params.get("splittype");
+		if(splitType.equals("greedyreducedcost")) {
+			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.MaximumReducedCost);
+		} else if(splitType.equals("greedyreducedarea")) {
+			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.MaximumReducedArea);
+		} else if(splitType.equals("incrtree")) {
+			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.IncrementalRTree);
+		}
+		return null;
+	}
+	
+	
 	public static ArrayList<ArrayList<Partition>> getSplitGroups(Path path, OperationsParams params, OptimizerType type) throws IOException {
 		ArrayList<ArrayList<Partition>> splitGroups = new ArrayList<>();
 		
@@ -203,6 +217,13 @@ public class RTreeOptimizer {
 			splitGroups = getSplitGroupsWithMaximumReducedCost(partitions, params);
 		} else if(type == OptimizerType.MaximumReducedArea) {
 			splitGroups = getSplitGroupsWithMaximumReducedArea(partitions, params);
+		} else if(type == OptimizerType.IncrementalRTree) {
+			ArrayList<Partition> overflowPartitions = getOverflowPartitions(path, params);
+			for(Partition partition: overflowPartitions) {
+				ArrayList<Partition> group = new ArrayList<>();
+				group.add(partition);
+				splitGroups.add(group);
+			}
 		}
 		
 		return splitGroups;

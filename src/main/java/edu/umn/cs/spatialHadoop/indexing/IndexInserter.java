@@ -194,7 +194,6 @@ public class IndexInserter {
 	public static void flushLSMTree(Path currentPath, Path insertPath, OperationsParams params) throws IOException, ClassNotFoundException, InterruptedException {
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(conf);
-		String sindex = params.get("sindex");
 		
 		// If there is no component so far, pack the current index as the first component
 		Path lsmMasterPath = new Path(currentPath, "_master.lsm");
