@@ -40,38 +40,5 @@ public class DynamicIndexer {
 		long t4 = System.currentTimeMillis();
 		System.out.println("Total splitting time in millis " + (t4 - t3));
 		System.out.println("Total dynamic indexing time in millis " + (t4 - t1));
-
-		// if(splitType.equals("incrtree")) {
-		// ArrayList<Partition> splitPartitions =
-		// PartitionSelector.getOverflowPartitions(currentPath, params);
-		// long t3 = System.currentTimeMillis();
-		// System.out.println("Total optimizing time in millis " + (t3 - t2));
-		// MetadataUtil.printPartitionSummary(splitPartitions, blockSize);
-		//
-		// PartitionSplitter.reorganizePartitions(currentPath, splitPartitions, params);
-		//
-		// long t4 = System.currentTimeMillis();
-		// System.out.println("Total reorganizing time in millis " + (t4 - t3));
-		// System.out.println("Total dynamic indexing time in millis " + (t4 - t1));
-		// } else {
-		// ArrayList<ArrayList<Partition>> splitGroups = new ArrayList<>();
-		// if(splitType.equals("greedyreducedcost")) {
-		// splitGroups = PartitionSelector.getSplitGroups(currentPath, params,
-		// PartitionSelector.OptimizerType.MaximumReducedCost);
-		// } else if(splitType.equals("greedyreducedarea")) {
-		// splitGroups = PartitionSelector.getSplitGroups(currentPath, params,
-		// PartitionSelector.OptimizerType.MaximumReducedArea);
-		// }
-		//
-		// long t3 = System.currentTimeMillis();
-		// System.out.println("Total optimizing time in millis " + (t3 - t2));
-		// MetadataUtil.printGroupSummary(splitGroups, blockSize);
-		//
-		// PartitionSplitter.reorganizeGroups(currentPath, splitGroups, params);
-		//
-		// long t4 = System.currentTimeMillis();
-		// System.out.println("Total reorganizing time in millis " + (t4 - t3));
-		// System.out.println("Total dynamic indexing time in millis " + (t4 - t1));
-		// }
 	}
 }

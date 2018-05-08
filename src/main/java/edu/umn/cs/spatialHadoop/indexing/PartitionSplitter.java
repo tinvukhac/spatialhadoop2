@@ -302,13 +302,21 @@ public class PartitionSplitter {
 			List<Partition> group = splitGroups.get(iGroup);
 			final OperationsParams indexParams = new OperationsParams(params);
 			indexParams.setBoolean("local", false);
+			indexParams.setBoolean("isAppending", false);
+			
+			Partition tempPartition = group.get(0);
 			final Path[] inPaths = new Path[group.size()];
 			for (int iPartition = 0; iPartition < group.size(); iPartition++) {
 				inPaths[iPartition] = new Path(indexPath, group.get(iPartition).filename);
+				tempPartition.expand(group.get(iPartition));
 			}
+			Rectangle groupRect = (Rectangle)tempPartition;
+			indexParams.set("mbr", String.format("%f,%f,%f,%f", groupRect.x1, groupRect.y1, groupRect.x2, groupRect.y2));
+			
 			do {
 				tempPaths[iGroup] = new Path(indexPath.getParent(), Integer.toString((int) (Math.random() * 1000000)));
 			} while (fs.exists(tempPaths[iGroup]));
+			
 			final Path tempPath = tempPaths[iGroup];
 			indexJobs[iGroup] = new Thread() {
 				@Override
@@ -338,13 +346,17 @@ public class PartitionSplitter {
 		for (int iGroup = 0; iGroup < indexJobs.length; iGroup++) {
 			indexJobs[iGroup].join();
 			// Remove all partitions that were indexed by the job
+//			System.out.println("Removing old patitions...");
 			for (Partition oldP : splitGroups.get(iGroup)) {
+//				System.out.println("Removing partition " + oldP.filename);
 				if (!mergedPartitions.remove(oldP))
 					throw new RuntimeException(
 							"The partition " + oldP + " is being reorganized but does not exist in " + indexPath);
 			}
 
 			ArrayList<Partition> newPartitions = MetadataUtil.getPartitions(tempPaths[iGroup], params);
+//			System.out.println("tempPath = " + tempPaths[iGroup].toString());
+//			System.out.println("New partitions size = " + newPartitions.size());
 			for (Partition newPartition : newPartitions) {
 				// Generate a new ID and filename to ensure it does not override an existing
 				// file
@@ -360,6 +372,7 @@ public class PartitionSplitter {
 			}
 		}
 		// Write back the partitions to the master file
+//		System.out.println("Merged partitions = " + mergedPartitions.size());
 		Path masterPath = fs.listStatus(indexPath, SpatialSite.MasterFileFilter)[0].getPath();
 		MetadataUtil.dumpToFile(mergedPartitions, masterPath);
 

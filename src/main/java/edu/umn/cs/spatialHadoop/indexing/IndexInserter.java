@@ -16,6 +16,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.GenericOptionsParser;
 import edu.umn.cs.spatialHadoop.OperationsParams;
 import edu.umn.cs.spatialHadoop.io.Text2;
+import edu.umn.cs.spatialHadoop.util.FileUtil;
 
 public class IndexInserter {
 
@@ -161,25 +162,27 @@ public class IndexInserter {
 
 		// Append files in temp directory to corresponding files in current path
 		for (Partition partition : partitionsToAppend) {
-			FSDataOutputStream out;
+//			FSDataOutputStream out;
 			Path filePath = new Path(currentPath, partition.filename);
-			if (!fs.exists(filePath)) {
-				out = fs.create(filePath);
-			} else {
-				out = fs.append(filePath);
-			}
-			BufferedReader br = new BufferedReader(
-					new InputStreamReader(fs.open(new Path(tempPath, partition.filename))));
-			String line;
-			PrintWriter writer = new PrintWriter(out);
-			do {
-				line = br.readLine();
-				if (line != null) {
-					writer.append("\n" + line);
-				}
-			} while (line != null);
-			writer.close();
-			out.close();
+//			if (!fs.exists(filePath)) {
+//				out = fs.create(filePath);
+//			} else {
+//				out = fs.append(filePath);
+//			}
+//			BufferedReader br = new BufferedReader(
+//					new InputStreamReader(fs.open(new Path(tempPath, partition.filename))));
+//			String line;
+//			PrintWriter writer = new PrintWriter(out);
+//			do {
+//				line = br.readLine();
+//				if (line != null) {
+//					writer.append("\n" + line);
+//				}
+//			} while (line != null);
+//			writer.close();
+//			out.close();
+			
+			FileUtil.concat(params, fs, filePath, new Path(tempPath, partition.filename));
 		}
 
 		// Update master and wkt file

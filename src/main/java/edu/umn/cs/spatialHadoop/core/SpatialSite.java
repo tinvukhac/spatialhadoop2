@@ -270,6 +270,15 @@ public class SpatialSite {
 	public static Shape getShape(Configuration conf, String param) {
 		return OperationsParams.getShape(conf, param);
 	}
+	
+	public static Class<? extends Shape> getShape(String name) {
+	    try {
+	      return Class.forName(name).asSubclass(Shape.class);
+	    } catch (ClassNotFoundException e) {
+	      LOG.warn("Could not find the shape "+name);
+	      return null;
+	    }
+	  }
 
 	/**
 	 * Returns the global index (partitions) of a file that is indexed using the

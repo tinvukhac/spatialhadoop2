@@ -75,7 +75,7 @@ public class Main {
       pgd.addClass("readfile", ReadFile.class,
           "Retrieve some information about the index of a file");
 
-      pgd.addClass("sample", Sampler.class,
+      pgd.addClass("sample", Sampler3.class,
           "Reads a random sample from the input file");
 
       pgd.addClass("generate", RandomSpatialGenerator.class,

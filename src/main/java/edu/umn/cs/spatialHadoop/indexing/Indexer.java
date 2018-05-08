@@ -51,6 +51,7 @@ import edu.umn.cs.spatialHadoop.mapreduce.SpatialRecordReader3;
 import edu.umn.cs.spatialHadoop.nasa.HDFRecordReader;
 import edu.umn.cs.spatialHadoop.operations.FileMBR;
 import edu.umn.cs.spatialHadoop.operations.Sampler;
+import edu.umn.cs.spatialHadoop.operations.Sampler3;
 import edu.umn.cs.spatialHadoop.util.FileUtil;
 
 /**
@@ -92,8 +93,8 @@ public class Indexer {
 		PartitionerReplicate.put("r*tree+", true);
 
 		LocalIndexes = new HashMap<String, Class<? extends LocalIndexer>>();
-		LocalIndexes.put("rtree", RTreeLocalIndexer.class);
-		LocalIndexes.put("r+tree", RTreeLocalIndexer.class);
+		// LocalIndexes.put("rtree", RTreeLocalIndexer.class);
+		// LocalIndexes.put("r+tree", RTreeLocalIndexer.class);
 	}
 
 	/**
@@ -190,6 +191,7 @@ public class Indexer {
 		Partitioner partitioner;
 		boolean isAppending = paramss.getBoolean("isAppending", false);
 		if (isAppending) {
+			System.out.println("Indexing as a part of appending.");
 			Path currentPath = new Path(paramss.get("currentPath"));
 			ArrayList<Partition> partitions = MetadataUtil.getPartitions(currentPath, paramss);
 			CellInfo[] cells = new CellInfo[partitions.size()];
@@ -247,7 +249,7 @@ public class Indexer {
 	}
 
 	public static Partitioner createPartitioner(Path in, Path out, Configuration job, String partitionerName)
-			throws IOException {
+			throws IOException, ClassNotFoundException, InterruptedException {
 		return createPartitioner(new Path[] { in }, out, job, partitionerName);
 	}
 
@@ -260,9 +262,11 @@ public class Indexer {
 	 * @param partitionerName
 	 * @return
 	 * @throws IOException
+	 * @throws InterruptedException
+	 * @throws ClassNotFoundException
 	 */
 	public static Partitioner createPartitioner(Path[] ins, Path out, Configuration job, String partitionerName)
-			throws IOException {
+			throws IOException, ClassNotFoundException, InterruptedException {
 		try {
 			Partitioner partitioner;
 			Class<? extends Partitioner> partitionerClass = PartitionerClasses.get(partitionerName.toLowerCase());
@@ -291,39 +295,55 @@ public class Indexer {
 			long estimatedOutSize = (long) (inSize * (1.0 + job.getFloat(SpatialSite.INDEXING_OVERHEAD, 0.1f)));
 			FileSystem outFS = out.getFileSystem(job);
 			long outBlockSize = outFS.getDefaultBlockSize(out);
+			//
+			// final List<Point> sample = new ArrayList<Point>();
+			// float sample_ratio = job.getFloat(SpatialSite.SAMPLE_RATIO, 0.01f);
+			// long sample_size = job.getLong(SpatialSite.SAMPLE_SIZE, 100 * 1024 * 1024);
+			//
+			// LOG.info("Reading a sample of " + (int) Math.round(sample_ratio * 100) +
+			// "%");
+			// ResultCollector<Point> resultCollector = new ResultCollector<Point>() {
+			// @Override
+			// public void collect(Point p) {
+			// sample.add(p.clone());
+			// }
+			// };
+			//
+			// OperationsParams params2 = new OperationsParams(job);
+			// params2.setFloat("ratio", sample_ratio);
+			// params2.setLong("size", sample_size);
+			// if (job.get("shape") != null)
+			// params2.set("shape", job.get("shape"));
+			// if (job.get("local") != null)
+			// params2.set("local", job.get("local"));
+			// params2.setClass("outshape", Point.class, Shape.class);
+			// Sampler.sample(ins, resultCollector, params2);
 
-			final List<Point> sample = new ArrayList<Point>();
-			float sample_ratio = job.getFloat(SpatialSite.SAMPLE_RATIO, 0.01f);
-			long sample_size = job.getLong(SpatialSite.SAMPLE_SIZE, 100 * 1024 * 1024);
-
-			LOG.info("Reading a sample of " + (int) Math.round(sample_ratio * 100) + "%");
-			ResultCollector<Point> resultCollector = new ResultCollector<Point>() {
-				@Override
-				public void collect(Point p) {
-					sample.add(p.clone());
-				}
-			};
-
-			OperationsParams params2 = new OperationsParams(job);
-			params2.setFloat("ratio", sample_ratio);
-			params2.setLong("size", sample_size);
-			if (job.get("shape") != null)
-				params2.set("shape", job.get("shape"));
-			if (job.get("local") != null)
-				params2.set("local", job.get("local"));
-			params2.setClass("outshape", Point.class, Shape.class);
-			Sampler.sample(ins, resultCollector, params2);
+//			System.out.println("Sampling using Sampler3");
+			OperationsParams sampleParams = new OperationsParams(job);
+			sampleParams.setClass("outshape", Point.class, Shape.class);
+			sampleParams.setFloat("ratio", sampleParams.getFloat(SpatialSite.SAMPLE_RATIO, 0.01f));
+			final String[] sample = Sampler3.takeSample(ins, sampleParams);
 			long t2 = System.currentTimeMillis();
-			System.out.println("Total time for sampling in millis: " + (t2 - t1));
-			LOG.info("Finished reading a sample of " + sample.size() + " records");
-
+//			System.out.println("Total time for sampling in millis: " + (t2 - t1));
+			LOG.info("Finished reading a sample of " + sample.length + " records");
+			Point[] samplePoints = new Point[sample.length];
+			for (int i = 0; i < sample.length; i++) {
+				samplePoints[i] = new Point();
+				samplePoints[i].fromText(new Text(sample[i]));
+			}
 			int partitionCapacity = (int) Math.max(1,
-					Math.floor((double) sample.size() * outBlockSize / estimatedOutSize));
+					Math.floor((double) sample.length * outBlockSize / estimatedOutSize));
+
+			// int partitionCapacity = (int) Math.max(1,
+			// Math.floor((double) sample.size() * outBlockSize / estimatedOutSize));
 			int numPartitions = Math.max(1, (int) Math.ceil((float) estimatedOutSize / outBlockSize));
 			LOG.info("Partitioning the space into " + numPartitions + " partitions with capacity of "
 					+ partitionCapacity);
 
-			partitioner.createFromPoints(inMBR, sample.toArray(new Point[sample.size()]), partitionCapacity);
+			partitioner.createFromPoints(inMBR, samplePoints, partitionCapacity);
+			// partitioner.createFromPoints(inMBR, sample.toArray(new Point[sample.size()]),
+			// partitionCapacity);
 
 			return partitioner;
 		} catch (InstantiationException e) {
@@ -336,7 +356,7 @@ public class Indexer {
 	}
 
 	private static void indexLocal(Path[] inPaths, final Path outPath, OperationsParams params)
-			throws IOException, InterruptedException {
+			throws IOException, InterruptedException, ClassNotFoundException {
 		Job job = Job.getInstance(params);
 		final Configuration conf = job.getConfiguration();
 
