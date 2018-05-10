@@ -2,19 +2,27 @@ package edu.umn.cs.spatialHadoop.indexing;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import edu.umn.cs.spatialHadoop.OperationsParams;
 import edu.umn.cs.spatialHadoop.core.Rectangle;
+import edu.umn.cs.spatialHadoop.indexing.LSMRTreeIndexer.RTreeComponent;
 
 public class PartitionSelector {
+	
+	private static final int LSM_COMPACTION_MIN_COMPONENT = 3;
+	private static final int LSM_COMPACTION_MAX_COMPONENT = 5;
+	private static final double LSM_COMPACTION_RATIO = 1.0;
 	
 	public enum OptimizerType {
 		MaximumReducedCost,
 		MaximumReducedArea,
-		IncrementalRTree
+		IncrementalRTree,
+		LSMCompaction
 	}
 	
 	// Incremental RTree optimizer
@@ -195,6 +203,55 @@ public class PartitionSelector {
 		return bestPartition;
 	}
 	
+	/**
+	 * Compaction policy: Trying to find the first component that has a size less than the total of 
+	 * all smaller components multiplied by compaction ratio. 
+	 * Once that file is found, compact that component with all subsequent components
+	 * @param components
+	 * @return
+	 */
+	private static ArrayList<LSMComponent> getComponentsToMerge(ArrayList<LSMComponent> components) {
+		ArrayList<LSMComponent> componentsToMerge = new ArrayList<LSMComponent>();
+		
+		// Sort component by component ID (oldest to newest)
+		Collections.sort(components, new Comparator<LSMComponent>() {
+			@Override
+			public int compare(LSMComponent o1, LSMComponent o2) {
+				return o1.id - o2.id;
+			}
+		});
+		
+		for(int i = 0; i < components.size(); i++) {
+			long sum = 0;
+			LSMComponent currentComponent = components.get(i);
+			for(LSMComponent c: components) {
+				if(c.size < currentComponent.size) {
+					sum += c.size;
+				}
+			}
+			
+			if(currentComponent.size < LSM_COMPACTION_RATIO * sum) {
+				for(int j = i; j < components.size(); j++) {
+					componentsToMerge.add(components.get(j));
+				}
+				break;
+			}
+		}
+		
+		System.out.println("Component to be merged:");
+		for(LSMComponent c: componentsToMerge) {
+			System.out.println(c.name);
+		}
+		
+		return componentsToMerge;
+	}
+	
+	public static ArrayList<LSMComponent> getComponentsToMerge(Path path, OperationsParams params) throws IOException {
+		Path lsmMasterPath = new Path(path, IndexInserter.LSM_MASTER);
+		ArrayList<LSMComponent> components = MetadataUtil.getLSMComponents(lsmMasterPath);
+		return getComponentsToMerge(components);
+	}
+	
 	public static ArrayList<ArrayList<Partition>> getSplitGroups(Path path, OperationsParams params) throws IOException {
 		String splitType = params.get("splittype");
 		if(splitType.equals("greedyreducedcost")) {
@@ -203,7 +260,10 @@ public class PartitionSelector {
 			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.MaximumReducedArea);
 		} else if(splitType.equals("incrtree")) {
 			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.IncrementalRTree);
-		}
+		} 
+//		else if(splitType.equals("lsmcompaction")) {
+//			return PartitionSelector.getSplitGroups(path, params, PartitionSelector.OptimizerType.LSMCompaction);
+//		}
 		return null;
 	}
 	
@@ -224,7 +284,25 @@ public class PartitionSelector {
 				group.add(partition);
 				splitGroups.add(group);
 			}
-		}
+		} 
+//		else if(type == OptimizerType.LSMCompaction) {
+//			ArrayList<Partition> partitionsToMerge = new ArrayList<Partition>();
+//			Path lsmMasterPath = new Path(path, IndexInserter.LSM_MASTER);
+//			ArrayList<LSMComponent> components = MetadataUtil.getLSMComponents(lsmMasterPath);
+//			ArrayList<LSMComponent> componentsToMerge = getComponentsToMerge(components);
+//			
+//			if(componentsToMerge.size() > 1) {
+//				for(Partition p: partitions) {
+//					String componentName = p.filename.split("/")[0];
+//					for(LSMComponent c: componentsToMerge) {
+//						if(c.name.equals(componentName)) {
+//							partitionsToMerge.add(p);
+//						}
+//					}
+//				}
+//				splitGroups.add(partitionsToMerge);
+//			}
+//		}
 		
 		return splitGroups;
 	}

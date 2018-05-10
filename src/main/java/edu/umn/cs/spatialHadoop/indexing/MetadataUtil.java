@@ -28,14 +28,16 @@ public class MetadataUtil {
 
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(conf);
-
-		Text tempLine = new Text2();
-		@SuppressWarnings("resource")
-		LineReader in = new LineReader(fs.open(masterPath));
-		while (in.readLine(tempLine) > 0) {
-			Partition tempPartition = new Partition();
-			tempPartition.fromText(tempLine);
-			partitions.add(tempPartition);
+		
+		if(fs.exists(masterPath)) {
+			Text tempLine = new Text2();
+			@SuppressWarnings("resource")
+			LineReader in = new LineReader(fs.open(masterPath));
+			while (in.readLine(tempLine) > 0) {
+				Partition tempPartition = new Partition();
+				tempPartition.fromText(tempLine);
+				partitions.add(tempPartition);
+			}
 		}
 
 		return partitions;

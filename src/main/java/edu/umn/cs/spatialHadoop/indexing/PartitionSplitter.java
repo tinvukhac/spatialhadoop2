@@ -291,9 +291,47 @@ public class PartitionSplitter {
 			fs.delete(new Path(path, p.filename));
 		}
 	}
+	
+	@SuppressWarnings("deprecation")
+	public static void compact(Path indexPath, ArrayList<LSMComponent> componentsToMerge, OperationsParams params) throws IOException, ClassNotFoundException, InterruptedException {
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+		
+		Path lsmMasterPath = new Path(indexPath, IndexInserter.LSM_MASTER);
+		ArrayList<LSMComponent> components = MetadataUtil.getLSMComponents(lsmMasterPath);
+		LSMComponent newComponent = MetadataUtil.createNewLSMComponent(components);
+		Path newComponentPath = new Path(indexPath, newComponent.name);
+		
+		Path[] inPaths = new Path[componentsToMerge.size()];
+		for(int i = 0; i < componentsToMerge.size(); i++) {
+			inPaths[i] = new Path(indexPath, componentsToMerge.get(i).name);
+		}
+		
+		Job job = Indexer.index(inPaths, newComponentPath, params);
+		if (job.isSuccessful()) {
+			long newComponentSize = fs.getContentSummary(newComponentPath).getSpaceConsumed();
+			newComponent.setSize(newComponentSize);
+			components.add(newComponent);
+		}
+		
+		// Remove old components
+		ArrayList<LSMComponent> componentsToRemove = new ArrayList<>();
+		for(LSMComponent c: components) {
+			for(LSMComponent mergedComponent: componentsToMerge) {
+				if(c.id == mergedComponent.id) {
+					componentsToRemove.add(c);
+					fs.delete(new Path(indexPath, c.name));
+				}
+			}
+		}
+		
+		components.removeAll(componentsToRemove);
+		MetadataUtil.dumpLSMComponentToFile(components, lsmMasterPath);
+		IndexInserter.mergeComponentPartitions(indexPath, params);
+	}
 
 	public static void reorganize(Path indexPath, ArrayList<ArrayList<Partition>> splitGroups, OperationsParams params)
-			throws IOException, InterruptedException {
+			throws IOException, InterruptedException, ClassNotFoundException {
 		FileSystem fs = indexPath.getFileSystem(params);
 		// A list of temporary paths where the reorganized partitions will be stored.
 		Path[] tempPaths = new Path[splitGroups.size()];

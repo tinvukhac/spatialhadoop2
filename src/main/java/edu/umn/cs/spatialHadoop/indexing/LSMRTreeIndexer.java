@@ -348,23 +348,6 @@ public class LSMRTreeIndexer {
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException, InterruptedException,
 			InstantiationException, IllegalAccessException {
-		// OperationsParams params = new OperationsParams(new
-		// GenericOptionsParser(args));
-		//
-		// if (!params.checkInputOutput(true)) {
-		// printUsage();
-		// return;
-		// }
-		//
-		// Path inputPath = params.getInputPath();
-		// Path outputPath = params.getOutputPath();
-		//
-		// // The spatial index to use
-		// long t1 = System.currentTimeMillis();
-		// insertByBuffer(inputPath, outputPath, params);
-		// // checkPolicy(inputPath);
-		// long t2 = System.currentTimeMillis();
-		// System.out.println("Total indexing time in millis " + (t2 - t1));
 
 		OperationsParams params = new OperationsParams(new GenericOptionsParser(args));
 

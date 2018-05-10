@@ -29,16 +29,31 @@ public class DynamicIndexer {
 		long t2 = System.currentTimeMillis();
 		System.out.println("Total appending time in millis " + (t2 - t1));
 
-		// Partition selection
-		ArrayList<ArrayList<Partition>> splitGroups = PartitionSelector.getSplitGroups(currentPath, params);
-		long t3 = System.currentTimeMillis();
-		System.out.println("Total optimization time in millis " + (t3 - t2));
-		System.out.println("Number of groups = " + splitGroups.size());
+		if(params.get("splittype").equals("lsmcompaction")) {
+			// Partition selection
+			ArrayList<LSMComponent> componentsToMerge = PartitionSelector.getComponentsToMerge(currentPath, params);
+			long t3 = System.currentTimeMillis();
+			System.out.println("Total optimization time in millis " + (t3 - t2));
+			
+			// Partition splitting
+			if(componentsToMerge.size() > 1) {
+				PartitionSplitter.compact(currentPath, componentsToMerge, params);
+			}
+			long t4 = System.currentTimeMillis();
+			System.out.println("Total splitting time in millis " + (t4 - t3));
+			System.out.println("Total dynamic indexing time in millis " + (t4 - t1));
+		} else {
+			// Partition selection
+			ArrayList<ArrayList<Partition>> splitGroups = PartitionSelector.getSplitGroups(currentPath, params);
+			long t3 = System.currentTimeMillis();
+			System.out.println("Total optimization time in millis " + (t3 - t2));
+			System.out.println("Number of groups = " + splitGroups.size());
 
-		// Partition splitting
-		PartitionSplitter.reorganize(currentPath, splitGroups, params);
-		long t4 = System.currentTimeMillis();
-		System.out.println("Total splitting time in millis " + (t4 - t3));
-		System.out.println("Total dynamic indexing time in millis " + (t4 - t1));
+			// Partition splitting
+			PartitionSplitter.reorganize(currentPath, splitGroups, params);
+			long t4 = System.currentTimeMillis();
+			System.out.println("Total splitting time in millis " + (t4 - t3));
+			System.out.println("Total dynamic indexing time in millis " + (t4 - t1));
+		}
 	}
 }

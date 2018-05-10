@@ -20,6 +20,8 @@ import edu.umn.cs.spatialHadoop.util.FileUtil;
 
 public class IndexInserter {
 
+	public static final String LSM_MASTER = "_lsm.master";
+	
 	public enum InsertType {
 		RTReeAppending, LSMTreeFlushing
 	}
@@ -162,26 +164,26 @@ public class IndexInserter {
 
 		// Append files in temp directory to corresponding files in current path
 		for (Partition partition : partitionsToAppend) {
-//			FSDataOutputStream out;
+			// FSDataOutputStream out;
 			Path filePath = new Path(currentPath, partition.filename);
-//			if (!fs.exists(filePath)) {
-//				out = fs.create(filePath);
-//			} else {
-//				out = fs.append(filePath);
-//			}
-//			BufferedReader br = new BufferedReader(
-//					new InputStreamReader(fs.open(new Path(tempPath, partition.filename))));
-//			String line;
-//			PrintWriter writer = new PrintWriter(out);
-//			do {
-//				line = br.readLine();
-//				if (line != null) {
-//					writer.append("\n" + line);
-//				}
-//			} while (line != null);
-//			writer.close();
-//			out.close();
-			
+			// if (!fs.exists(filePath)) {
+			// out = fs.create(filePath);
+			// } else {
+			// out = fs.append(filePath);
+			// }
+			// BufferedReader br = new BufferedReader(
+			// new InputStreamReader(fs.open(new Path(tempPath, partition.filename))));
+			// String line;
+			// PrintWriter writer = new PrintWriter(out);
+			// do {
+			// line = br.readLine();
+			// if (line != null) {
+			// writer.append("\n" + line);
+			// }
+			// } while (line != null);
+			// writer.close();
+			// out.close();
+
 			FileUtil.concat(params, fs, filePath, new Path(tempPath, partition.filename));
 		}
 
@@ -195,36 +197,65 @@ public class IndexInserter {
 		System.out.println("Complete!");
 	}
 
-	public static void flushLSMTree(Path currentPath, Path insertPath, OperationsParams params) throws IOException, ClassNotFoundException, InterruptedException {
+	public static void flushLSMTree(Path currentPath, Path insertPath, OperationsParams params)
+			throws IOException, ClassNotFoundException, InterruptedException {
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(conf);
-		
-		// If there is no component so far, pack the current index as the first component
-		Path lsmMasterPath = new Path(currentPath, "_master.lsm");
-		if(!fs.exists(lsmMasterPath)) {
+
+		// If there is no component so far, pack the current index as the first
+		// component
+		Path lsmMasterPath = new Path(currentPath, LSM_MASTER);
+		if (!fs.exists(lsmMasterPath)) {
 			int firstComponentId = 1;
 			String firstComponentName = "c" + firstComponentId;
 			Path parentPath = currentPath.getParent();
 			fs.rename(currentPath, new Path(parentPath, firstComponentName));
 			fs.mkdirs(currentPath);
-			fs.rename(new Path(parentPath, firstComponentName), new Path(currentPath, firstComponentName));
-			LSMComponent component = new LSMComponent(firstComponentId, firstComponentName);
+			Path firstComponentPath = new Path(currentPath, firstComponentName);
+			fs.rename(new Path(parentPath, firstComponentName), firstComponentPath);
+			long componentSize = fs.getContentSummary(firstComponentPath).getSpaceConsumed();
+			LSMComponent component = new LSMComponent(firstComponentId, firstComponentName, componentSize);
 			ArrayList<LSMComponent> components = new ArrayList<>();
 			components.add(component);
 			MetadataUtil.dumpLSMComponentToFile(components, lsmMasterPath);
+//			mergeComponentPartitions(currentPath, params);
 		}
-		
+
 		ArrayList<LSMComponent> components = MetadataUtil.getLSMComponents(lsmMasterPath);
 		LSMComponent newComponent = MetadataUtil.createNewLSMComponent(components);
 		Path newComponentPath = new Path(currentPath, newComponent.name);
-		fs.mkdirs(newComponentPath);
 
-		Indexer.index(insertPath, newComponentPath, params);
+		Job job = Indexer.index(insertPath, newComponentPath, params);
+		if (job.isSuccessful()) {
+			long newComponentSize = fs.getContentSummary(newComponentPath).getSpaceConsumed();
+			newComponent.setSize(newComponentSize);
+			components.add(newComponent);
+			MetadataUtil.dumpLSMComponentToFile(components, lsmMasterPath);
+		}
+
+		mergeComponentPartitions(currentPath, params);
 	}
-	
-	public static void insert(Path currentPath, Path insertPath, OperationsParams params) throws ClassNotFoundException, InstantiationException, IllegalAccessException, IOException, InterruptedException {
+
+	public static void mergeComponentPartitions(Path currentPath, OperationsParams params) throws IOException {
+		Path lsmMasterPath = new Path(currentPath, LSM_MASTER);
+		ArrayList<LSMComponent> components = MetadataUtil.getLSMComponents(lsmMasterPath);
+		// Aggregate master files of all components
+		ArrayList<Partition> mergedPartitions = new ArrayList<Partition>();
+		for (LSMComponent component : components) {
+			Path componentPath = new Path(currentPath, component.name);
+			ArrayList<Partition> componentPartitions = MetadataUtil.getPartitions(componentPath, params);
+			for (Partition partition : componentPartitions) {
+				partition.filename = component.name + "/" + partition.filename;
+				mergedPartitions.add(partition);
+			}
+		}
+		MetadataUtil.dumpToFile(mergedPartitions, currentPath, "_master." + params.get("sindex"));
+	}
+
+	public static void insert(Path currentPath, Path insertPath, OperationsParams params) throws ClassNotFoundException,
+			InstantiationException, IllegalAccessException, IOException, InterruptedException {
 		String insertType = params.get("inserttype");
-		
+
 		if (insertType.equals("rtreeappending")) {
 			params.setBoolean("isAppending", true);
 			appendRTree(currentPath, insertPath, params);
