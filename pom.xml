@@ -182,24 +182,27 @@
 		</dependency>
 
 		<!-- Common spatial and other libraries -->
-		<dependency>
-			<groupId>com.vividsolutions</groupId>
-			<artifactId>jts</artifactId>
-			<version>1.13</version>
-		</dependency>
+		<!-- <dependency> <groupId>com.vividsolutions</groupId> <artifactId>jts</artifactId> 
+			<version>1.13</version> </dependency> -->
 
 		<!-- https://mvnrepository.com/artifact/com.vividsolutions/jts-core -->
-		<!-- <dependency>
+		<dependency>
 			<groupId>com.vividsolutions</groupId>
 			<artifactId>jts-core</artifactId>
 			<version>1.14.0</version>
-		</dependency>-->
+		</dependency>
 
 		<!-- https://mvnrepository.com/artifact/com.vividsolutions/jts-io -->
 		<dependency>
 			<groupId>com.vividsolutions</groupId>
 			<artifactId>jts-io</artifactId>
 			<version>1.14.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.wololo</groupId>
+			<artifactId>jts2geojson</artifactId>
+			<version>0.10.0</version>
 		</dependency>
 
 		<dependency>

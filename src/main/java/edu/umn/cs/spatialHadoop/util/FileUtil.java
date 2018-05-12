@@ -38,10 +38,8 @@ import edu.umn.cs.spatialHadoop.nasa.HTTPFileSystem;
  */
 public final class FileUtil {
 
-	public static String copyFile(Configuration job, FileStatus fileStatus)
-			throws IOException {
-		return FileUtil.copyFileSplit(job, new FileSplit(fileStatus.getPath(),
-				0, fileStatus.getLen(), new String[0]));
+	public static String copyFile(Configuration job, FileStatus fileStatus) throws IOException {
+		return FileUtil.copyFileSplit(job, new FileSplit(fileStatus.getPath(), 0, fileStatus.getLen(), new String[0]));
 	}
 
 	/**
@@ -53,24 +51,22 @@ public final class FileUtil {
 	 * @return
 	 * @throws IOException
 	 */
-	public static String copyFileSplit(Configuration conf, FileSplit split)
-			throws IOException {
+	public static String copyFileSplit(Configuration conf, FileSplit split) throws IOException {
 		FileSystem fs = split.getPath().getFileSystem(conf);
-		
+
 		// Special case of a local file. Skip copying the file
 		if (fs instanceof LocalFileSystem && split.getStart() == 0)
 			return split.getPath().toUri().getPath();
-		
+
 		File destFile = File.createTempFile(split.getPath().getName(), "tmp");
 		// Special handling for HTTP files for more efficiency
-		/*if (fs instanceof HTTPFileSystem && split.getStart() == 0) {
-		  URL website = split.getPath().toUri().toURL();
-		  ReadableByteChannel rbc = Channels.newChannel(website.openStream());
-		  FileOutputStream fos = new FileOutputStream(destFile);
-		  fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
-		  fos.close();
-		  return destFile.getAbsolutePath();
-		}*/
+		/*
+		 * if (fs instanceof HTTPFileSystem && split.getStart() == 0) { URL website =
+		 * split.getPath().toUri().toURL(); ReadableByteChannel rbc =
+		 * Channels.newChannel(website.openStream()); FileOutputStream fos = new
+		 * FileOutputStream(destFile); fos.getChannel().transferFrom(rbc, 0,
+		 * Long.MAX_VALUE); fos.close(); return destFile.getAbsolutePath(); }
+		 */
 
 		// Length of input file. We do not depend on split.length because it is
 		// not
@@ -85,7 +81,7 @@ public final class FileUtil {
 
 		// Prepare output file for write
 		FileOutputStream out = new FileOutputStream(destFile);
-		
+
 		out.getChannel().transferFrom(rbc, 0, length);
 
 		in.close();
@@ -101,8 +97,7 @@ public final class FileUtil {
 	 * @return
 	 * @throws IOException
 	 */
-	public static String copyFile(Configuration conf, Path inFile)
-			throws IOException {
+	public static String copyFile(Configuration conf, Path inFile) throws IOException {
 		FileSystem fs = inFile.getFileSystem(conf);
 		return copyFile(conf, fs.getFileStatus(inFile));
 	}
@@ -113,25 +108,24 @@ public final class FileUtil {
 	 * @author ibrahimsabek
 	 * @param paths
 	 */
-	
-	public static Path writePathsToHDFSFile(OperationsParams params, Path[] paths){
+
+	public static Path writePathsToHDFSFile(OperationsParams params, Path[] paths) {
 		String tmpFileName = "pathsDictionary.txt";
 		Configuration conf = new Configuration();
 		try {
 			FileSystem fs = params.getPaths()[0].getFileSystem(conf);
-			Path hdfsFilePath = new Path(params.getPaths()[0].toString() + "/"
-					+ tmpFileName);	
+			Path hdfsFilePath = new Path(params.getPaths()[0].toString() + "/" + tmpFileName);
 			FSDataOutputStream out = fs.create(hdfsFilePath);
-			
+
 			for (int i = 0; i < paths.length; i++) {
 				StringBuilder pathStringBuilder = new StringBuilder();
 				pathStringBuilder.append(paths[i].toString());
 				pathStringBuilder.append("\n");
-				
+
 				byte[] bytArr = pathStringBuilder.toString().getBytes();
 				out.write(bytArr);
 			}
-					
+
 			out.close();
 
 			return hdfsFilePath;
@@ -139,9 +133,9 @@ public final class FileUtil {
 			e.printStackTrace();
 			return null;
 		}
-		
+
 	}
-	
+
 	/**
 	 * Writes paths to a file where each path is a line.
 	 * 
@@ -157,8 +151,7 @@ public final class FileUtil {
 			tempFile = new File(tmpFileName);
 			Path localFilePath = new Path(tempFile.getAbsolutePath());
 			FileOutputStream outStream = new FileOutputStream(tempFile);
-			buffWriter = new BufferedWriter(
-					new OutputStreamWriter(outStream));
+			buffWriter = new BufferedWriter(new OutputStreamWriter(outStream));
 
 			for (int i = 0; i < paths.length; i++) {
 				buffWriter.write(paths[i].toString());
@@ -167,8 +160,7 @@ public final class FileUtil {
 			// copy the local dictionary into an hdfs file
 			Configuration conf = new Configuration();
 			FileSystem fs = params.getPaths()[0].getFileSystem(conf);
-			Path hdfsFilePath = new Path(params.getPaths()[0].toString() + "/"
-					+ tmpFileName);
+			Path hdfsFilePath = new Path(params.getPaths()[0].toString() + "/" + tmpFileName);
 
 			copyFromLocal(localFilePath, fs, hdfsFilePath);
 
@@ -190,11 +182,9 @@ public final class FileUtil {
 	 * @param hdfsPath
 	 * @throws IOException
 	 */
-	private static void copyFromLocal(Path localPath, FileSystem hdfsFS,
-			Path hdfsPath) throws IOException {
+	private static void copyFromLocal(Path localPath, FileSystem hdfsFS, Path hdfsPath) throws IOException {
 		FSDataOutputStream out = hdfsFS.create(hdfsPath);
-		FileInputStream localInputStream = new FileInputStream(new File(
-				localPath.toString()));
+		FileInputStream localInputStream = new FileInputStream(new File(localPath.toString()));
 		int bytesRead;
 		byte[] localBuffer = new byte[1024];
 		while ((bytesRead = localInputStream.read(localBuffer)) > 0) {
@@ -213,148 +203,216 @@ public final class FileUtil {
 	 * @return
 	 * @throws IOException
 	 */
-	public static Path[] getFilesListInPath(Path path) throws IOException{
+	public static Path[] getFilesListInPath(Path path) throws IOException {
 		FileSystem fileSystem = path.getFileSystem(new Configuration());
 		FileStatus[] matchingDirs = fileSystem.listStatus(path);
 		Path[] pathsArr = new Path[matchingDirs.length];
-		for(int i = 0; i < matchingDirs.length; i++){
+		for (int i = 0; i < matchingDirs.length; i++) {
 			pathsArr[i] = matchingDirs[i].getPath();
 		}
 		return pathsArr;
 	}
 
 	/**
-	 * Get the actual size of all data in the given directory. If the input is
-	 * a single file, its size is returned immediately. If the input is a
-	 * directory, we returns the total size of all data in that directory.
-	 * If there is a global index, the size is retrieved from that global index.
-	 * Otherwise, we add up all the sizes of single files.
-	 * @param fs - the file system that contains the path
-	 * @param path - the path that contains the data
+	 * Get the actual size of all data in the given directory. If the input is a
+	 * single file, its size is returned immediately. If the input is a directory,
+	 * we returns the total size of all data in that directory. If there is a global
+	 * index, the size is retrieved from that global index. Otherwise, we add up all
+	 * the sizes of single files.
+	 * 
+	 * @param fs
+	 *            - the file system that contains the path
+	 * @param path
+	 *            - the path that contains the data
 	 * @return
-	 * @throws IOException 
+	 * @throws IOException
 	 */
-  public static long getPathSize(FileSystem fs, Path path) throws IOException {
-    FileStatus fileStatus = fs.getFileStatus(path);
-    // 1- Check if the path points to a file
-    if (!fileStatus.isDir())
-      return fileStatus.getLen();
-    // 2- Check if the input is indexed and get the cached size
-    GlobalIndex<Partition> gIndex = SpatialSite.getGlobalIndex(fs, path);
-    if (gIndex != null) {
-      long totalSize = 0;
-      for (Partition partition : gIndex)
-        totalSize += partition.size;
-      return totalSize;
-    }
-    // 3- Get the total size of all non-hidden files
-    long totalSize = 0;
-    FileStatus[] allFiles = fs.listStatus(path, SpatialSite.NonHiddenFileFilter);
-    for (FileStatus subFile : allFiles) {
-      if (!subFile.isDir())
-        totalSize += subFile.getLen();
-    }
-    return totalSize;
-  }
-  
-  /**
-   * Used to check whether files are compressed or not to remove their
-   * extension.
-   */
-  private static final CompressionCodecFactory compressionCodecs = 
-      new CompressionCodecFactory(new Configuration());
-  
-  /**
-   * Returns the extension of the file after removing any possible suffixes
-   * for compression
-   * @param path
-   * @return
-   */
-  public static String getExtensionWithoutCompression(Path path) {
-    String extension = "";
-    String fname = path.getName().toLowerCase();
-    if (compressionCodecs.getCodec(path) == null) {
-      // File not compressed, get the extension
-      int last_dot = fname.lastIndexOf('.');
-      if (last_dot >= 0) {
-        extension = fname.substring(last_dot + 1);
-      }
-    } else {
-      // File is comrpessed, get the extension before the compression
-      int last_dot = fname.lastIndexOf('.');
-      if (last_dot > 0) {
-        int prev_dot = fname.lastIndexOf('.', last_dot - 1);
-        if (prev_dot >= 0) {
-          extension = fname.substring(prev_dot + 1, last_dot);
-        }
-      }
-    }
-    return extension;
-  }
+	public static long getPathSize(FileSystem fs, Path path) throws IOException {
+		FileStatus fileStatus = fs.getFileStatus(path);
+		// 1- Check if the path points to a file
+		if (!fileStatus.isDir())
+			return fileStatus.getLen();
+		// 2- Check if the input is indexed and get the cached size
+		GlobalIndex<Partition> gIndex = SpatialSite.getGlobalIndex(fs, path);
+		if (gIndex != null) {
+			long totalSize = 0;
+			for (Partition partition : gIndex)
+				totalSize += partition.size;
+			return totalSize;
+		}
+		// 3- Get the total size of all non-hidden files
+		long totalSize = 0;
+		FileStatus[] allFiles = fs.listStatus(path, SpatialSite.NonHiddenFileFilter);
+		for (FileStatus subFile : allFiles) {
+			if (!subFile.isDir())
+				totalSize += subFile.getLen();
+		}
+		return totalSize;
+	}
 
-  public static CompressionCodec getCodec(Path file) {
-    return compressionCodecs.getCodec(file);
-  }
+	/**
+	 * Used to check whether files are compressed or not to remove their extension.
+	 */
+	private static final CompressionCodecFactory compressionCodecs = new CompressionCodecFactory(new Configuration());
 
-  /**
-   * Concatenates a set of files (in the same file system) into one file and
-   * deletes the source files afterwards.
-   * @param dest
-   * @param src
-   */
-  public static void concat(Configuration conf, FileSystem fs, Path dest, Path... src) throws IOException {
-    try {
-      // Try a possibly efficient implementation provided by the FileSystem
+	/**
+	 * Returns the extension of the file after removing any possible suffixes for
+	 * compression
+	 * 
+	 * @param path
+	 * @return
+	 */
+	public static String getExtensionWithoutCompression(Path path) {
+		String extension = "";
+		String fname = path.getName().toLowerCase();
+		if (compressionCodecs.getCodec(path) == null) {
+			// File not compressed, get the extension
+			int last_dot = fname.lastIndexOf('.');
+			if (last_dot >= 0) {
+				extension = fname.substring(last_dot + 1);
+			}
+		} else {
+			// File is comrpessed, get the extension before the compression
+			int last_dot = fname.lastIndexOf('.');
+			if (last_dot > 0) {
+				int prev_dot = fname.lastIndexOf('.', last_dot - 1);
+				if (prev_dot >= 0) {
+					extension = fname.substring(prev_dot + 1, last_dot);
+				}
+			}
+		}
+		return extension;
+	}
+
+	public static CompressionCodec getCodec(Path file) {
+		return compressionCodecs.getCodec(file);
+	}
+
+	/**
+	 * Concatenates a set of files (in the same file system) into one file and
+	 * deletes the source files afterwards.
+	 * 
+	 * @param dest
+	 * @param src
+	 */
+	public static void concat(Configuration conf, FileSystem fs, Path dest, Path... src) throws IOException {
+		try {
+			// Try a possibly efficient implementation provided by the FileSystem
 			// First, move the source files to the same destination directory
 			for (int isrc = 0; isrc < src.length; isrc++) {
 				Path oldS = src[isrc];
 				if (!oldS.getParent().equals(dest.getParent())) {
 					Path newS;
 					do {
-            newS = new Path(dest.getParent(), String.format("data_%06d.tmp",
-                Math.round(Math.random()*1000000)));
-          } while (fs.exists(newS));
+						newS = new Path(dest.getParent(),
+								String.format("data_%06d.tmp", Math.round(Math.random() * 1000000)));
+					} while (fs.exists(newS));
 					fs.rename(oldS, newS);
 					src[isrc] = newS;
 				}
 			}
-      fs.concat(dest, src);
-    } catch (UnsupportedOperationException e) {
-      Path tempPath = null;
-      // Unsupported by the file system, provide a less efficient naive implementation
-      OutputStream out;
-      if (!fs.exists(dest)) {
-        // Destination file does not exist. Create it
-        out = fs.create(dest);
-      } else {
-        // Destination file exists, try appending to it
-        try {
-          out = fs.append(dest);
-        } catch (IOException ee) {
-          // Append not supported, create a new file and write the existing destFile first
-          do {
-            tempPath = new Path(dest.getParent(), Integer.toString((int) (Math.random() * 1000000)));
-          } while (fs.exists(tempPath));
-          out = fs.create(tempPath);
-          InputStream in = fs.open(dest);
-          org.apache.hadoop.io.IOUtils.copyBytes(in, out, conf, false);
-          in.close();
-        }
-      }
-      for (Path s : src) {
-        if (!s.equals(dest)) {
-          InputStream in = fs.open(s);
-          org.apache.hadoop.io.IOUtils.copyBytes(in, out, conf, false);
-          in.close();
-        }
-        // Delete the concatenated (source) file
-        fs.delete(s, false);
-      }
-      out.close();
-      if (tempPath != null) {
-        fs.delete(dest, true);
-        fs.rename(tempPath, dest);
-      }
-    }
-  }
+			fs.concat(dest, src);
+		} catch (UnsupportedOperationException e) {
+			Path tempPath = null;
+			// Unsupported by the file system, provide a less efficient naive implementation
+			OutputStream out;
+			if (!fs.exists(dest)) {
+				// Destination file does not exist. Create it
+				out = fs.create(dest);
+			} else {
+				// Destination file exists, try appending to it
+				try {
+					out = fs.append(dest);
+				} catch (IOException ee) {
+					// Append not supported, create a new file and write the existing destFile first
+					do {
+						tempPath = new Path(dest.getParent(), Integer.toString((int) (Math.random() * 1000000)));
+					} while (fs.exists(tempPath));
+					out = fs.create(tempPath);
+					InputStream in = fs.open(dest);
+					org.apache.hadoop.io.IOUtils.copyBytes(in, out, conf, false);
+					in.close();
+				}
+			}
+			for (Path s : src) {
+				if (!s.equals(dest)) {
+					InputStream in = fs.open(s);
+					org.apache.hadoop.io.IOUtils.copyBytes(in, out, conf, false);
+					in.close();
+				}
+				// Delete the concatenated (source) file
+				fs.delete(s, false);
+			}
+			out.close();
+			if (tempPath != null) {
+				fs.delete(dest, true);
+				fs.rename(tempPath, dest);
+			}
+		}
+	}
+	
+	/**
+	 * Concatenates a set of files (in the same file system) into one file
+	 * 
+	 * @param deleteSrc
+	 * @param dest
+	 * @param src
+	 */
+	public static void concat(Configuration conf, FileSystem fs, boolean deleteSrc, Path dest, Path... src) throws IOException {
+		try {
+			// Try a possibly efficient implementation provided by the FileSystem
+			// First, move the source files to the same destination directory
+			for (int isrc = 0; isrc < src.length; isrc++) {
+				Path oldS = src[isrc];
+				if (!oldS.getParent().equals(dest.getParent())) {
+					Path newS;
+					do {
+						newS = new Path(dest.getParent(),
+								String.format("data_%06d.tmp", Math.round(Math.random() * 1000000)));
+					} while (fs.exists(newS));
+					fs.rename(oldS, newS);
+					src[isrc] = newS;
+				}
+			}
+			
+			fs.concat(dest, src);
+		} catch (UnsupportedOperationException e) {
+			System.out.println("UnsupportedOperationException");
+			Path tempPath = null;
+			// Unsupported by the file system, provide a less efficient naive implementation
+			OutputStream out;
+			if (!fs.exists(dest)) {
+				// Destination file does not exist. Create it
+				out = fs.create(dest);
+			} else {
+				// Destination file exists, try appending to it
+				try {
+					out = fs.append(dest);
+				} catch (IOException ee) {
+					// Append not supported, create a new file and write the existing destFile first
+					do {
+						tempPath = new Path(dest.getParent(), Integer.toString((int) (Math.random() * 1000000)));
+					} while (fs.exists(tempPath));
+					out = fs.create(tempPath);
+					InputStream in = fs.open(dest);
+					org.apache.hadoop.io.IOUtils.copyBytes(in, out, conf, false);
+					in.close();
+				}
+			}
+			for (Path s : src) {
+				if (!s.equals(dest)) {
+					InputStream in = fs.open(s);
+					org.apache.hadoop.io.IOUtils.copyBytes(in, out, conf, false);
+					in.close();
+				}
+				// Delete the concatenated (source) file
+				fs.delete(s, false);
+			}
+			out.close();
+			if (tempPath != null) {
+				fs.delete(dest, true);
+				fs.rename(tempPath, dest);
+			}
+		}
+	}
 }

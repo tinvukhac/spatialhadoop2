@@ -5,3 +5,8 @@ lib/ivy/**/*.jar
 *.classpath
 *.project
 /spatialhadoop.iml
+/cells_534852.partitions
+/cells_666396.partitions
+/cells_956669.partitions
+/cells_964101.partitions
+/cells_98375.partitions
